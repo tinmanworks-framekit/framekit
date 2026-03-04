@@ -17,6 +17,7 @@ Modular C/C++ application framework focused on single-process and multiprocess a
 - A runtime framework for building frontend/backend/worker style apps.
 - A contracts-first core where transport implementations can be optional.
 - A host for integrations with `netkit` and `mediakit`.
+- A window backend contract with an Apple Cocoa module implementation.
 
 ## Multiprocess Direction
 `framekit` owns multiprocess orchestration contracts and runtime behavior. Transport implementations are optional and supplied by `netkit`.
@@ -45,6 +46,15 @@ NetKit-linked sample executables:
 Core sample executables:
 - `framekit_single_process_example`
 - `framekit_multi_worker_example`
+
+Apple Cocoa backend module:
+```bash
+cmake -S . -B build \
+  -DFRAMEKIT_BUILD_TESTS=ON \
+  -DFRAMEKIT_BUILD_EXAMPLES=OFF \
+  -DFRAMEKIT_ENABLE_COCOA=ON
+cmake --build build
+```
 
 ## Attribution Request
 If you use FrameKit in your project, please mention FrameKit and credit George Gil / TinMan in your project documentation.
