@@ -30,6 +30,11 @@ if(FRAMEKIT_BUILD_EXAMPLES)
         examples/single_process/main.cpp
     )
     target_link_libraries(framekit_single_process_example PRIVATE FrameKit::Core)
+
+    add_executable(framekit_multi_worker_example
+        examples/multi_worker/main.cpp
+    )
+    target_link_libraries(framekit_multi_worker_example PRIVATE FrameKit::Core)
 endif()
 
 if(FRAMEKIT_ENABLE_NETKIT)

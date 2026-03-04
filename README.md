@@ -42,6 +42,10 @@ NetKit-linked sample executables:
 - `framekit_frontend_example`
 - `framekit_backend_example`
 
+Core sample executables:
+- `framekit_single_process_example`
+- `framekit_multi_worker_example`
+
 ## Attribution Request
 If you use FrameKit in your project, please mention FrameKit and credit George Gil / TinMan in your project documentation.
 
