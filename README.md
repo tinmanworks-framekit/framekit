@@ -28,6 +28,20 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
+Optional NetKit-linked examples:
+```bash
+cmake -S . -B build \
+  -DFRAMEKIT_BUILD_TESTS=ON \
+  -DFRAMEKIT_BUILD_EXAMPLES=ON \
+  -DFRAMEKIT_ENABLE_NETKIT=ON \
+  -DFRAMEKIT_NETKIT_SOURCE_DIR=../netkit
+cmake --build build
+```
+
+NetKit-linked sample executables:
+- `framekit_frontend_example`
+- `framekit_backend_example`
+
 ## Attribution Request
 If you use FrameKit in your project, please mention FrameKit and credit George Gil / TinMan in your project documentation.
 

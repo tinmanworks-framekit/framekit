@@ -4,6 +4,9 @@ project(framekit VERSION 0.1.0 LANGUAGES C CXX)
 
 option(FRAMEKIT_BUILD_TESTS "Build framekit tests" ON)
 option(FRAMEKIT_BUILD_EXAMPLES "Build framekit examples" ON)
+option(FRAMEKIT_ENABLE_NETKIT "Enable NetKit-dependent framekit integrations" OFF)
+
+set(FRAMEKIT_NETKIT_SOURCE_DIR "" CACHE PATH "Path to netkit source directory")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -27,6 +30,31 @@ if(FRAMEKIT_BUILD_EXAMPLES)
         examples/single_process/main.cpp
     )
     target_link_libraries(framekit_single_process_example PRIVATE FrameKit::Core)
+endif()
+
+if(FRAMEKIT_ENABLE_NETKIT)
+    if(NOT TARGET NetKit::Transport AND EXISTS "${FRAMEKIT_NETKIT_SOURCE_DIR}/CMakeLists.txt")
+        set(NETKIT_BUILD_TESTS OFF CACHE BOOL "Disable netkit tests when consumed by framekit" FORCE)
+        add_subdirectory(${FRAMEKIT_NETKIT_SOURCE_DIR} ${CMAKE_BINARY_DIR}/_deps/netkit EXCLUDE_FROM_ALL)
+    endif()
+
+    if(NOT TARGET NetKit::Transport)
+        find_package(netkit CONFIG QUIET)
+    endif()
+
+    if(FRAMEKIT_BUILD_EXAMPLES AND TARGET NetKit::Transport)
+        add_executable(framekit_frontend_example
+            examples/frontend_backend/frontend_main.cpp
+        )
+        target_link_libraries(framekit_frontend_example PRIVATE FrameKit::Core NetKit::Transport)
+
+        add_executable(framekit_backend_example
+            examples/frontend_backend/backend_main.cpp
+        )
+        target_link_libraries(framekit_backend_example PRIVATE FrameKit::Core NetKit::Transport)
+    elseif(FRAMEKIT_BUILD_EXAMPLES)
+        message(WARNING "FRAMEKIT_ENABLE_NETKIT=ON but NetKit::Transport was not found; skipping netkit examples")
+    endif()
 endif()
 
 if(FRAMEKIT_BUILD_TESTS)
