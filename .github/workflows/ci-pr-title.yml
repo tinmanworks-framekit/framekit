@@ -1,0 +1,22 @@
+name: CI (PR Title)
+
+on:
+  pull_request_target:
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  pr-title:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate PR title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+          regex='^(feat|fix|docs|chore|refactor|test|ci|build|perf|revert)(\([a-z0-9._/-]+\))?!?: .+$'
+          if [[ ! "$PR_TITLE" =~ $regex ]]; then
+            echo "Invalid PR title: $PR_TITLE"
+            echo "Expected format: <type>(<scope>): <summary>"
+            echo "Allowed types: feat|fix|docs|chore|refactor|test|ci|build|perf|revert"
+            exit 1
+          fi

@@ -5,8 +5,8 @@ on:
   pull_request:
 
 jobs:
-  framekit-core:
-    name: FrameKit (no netkit)
+  smoke:
+    name: smoke
     runs-on: ubuntu-latest
 
     steps:
@@ -23,7 +23,7 @@ jobs:
         run: ctest --test-dir build --output-on-failure
 
   framekit-with-netkit:
-    name: FrameKit + NetKit ShmPipe
+    name: netkit-shmpipe
     runs-on: ubuntu-latest
 
     steps:

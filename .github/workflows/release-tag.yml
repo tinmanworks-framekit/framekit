@@ -1,0 +1,135 @@
+name: Release (Tag)
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Release guard checks
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          REPO_FULL: ${{ github.repository }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          fail() {
+            echo "::error::$1"
+            exit 1
+          }
+
+          warn() {
+            echo "::warning::$1"
+          }
+
+          api_get() {
+            local endpoint="$1"
+            curl -fsSL \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${REPO_FULL}${endpoint}"
+          }
+
+          api_get_best_effort() {
+            local endpoint="$1"
+            local out_file="$2"
+            local code
+            code=$(curl -sS -o "$out_file" -w "%{http_code}" \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${REPO_FULL}${endpoint}")
+            echo "$code"
+          }
+
+          expected_checks_for_repo() {
+            case "$REPO_NAME" in
+              framekit|netkit|mediakit)
+                printf '%s\n' "smoke" "pr-title"
+                ;;
+              *)
+                printf '%s\n' "pr-title"
+                ;;
+            esac
+          }
+
+          check_branch_protection() {
+            local branch="$1"
+            local expected
+            expected="$(expected_checks_for_repo)"
+
+            local prot_file sig_file
+            prot_file="$(mktemp)"
+            sig_file="$(mktemp)"
+            trap 'rm -f "$prot_file" "$sig_file"' EXIT
+
+            local prot_code
+            prot_code="$(api_get_best_effort "/branches/${branch}/protection" "$prot_file")"
+            if [ "$prot_code" != "200" ]; then
+              warn "Best-effort protection check skipped for ${branch}: HTTP ${prot_code}"
+              return 0
+            fi
+
+            jq -e '.required_status_checks != null' "$prot_file" >/dev/null || fail "Missing required status checks protection on ${branch}"
+            jq -e '.required_pull_request_reviews != null' "$prot_file" >/dev/null || fail "Missing required PR reviews protection on ${branch}"
+            jq -e '.allow_force_pushes.enabled == false' "$prot_file" >/dev/null || fail "Force-push must be blocked on ${branch}"
+            jq -e '.allow_deletions.enabled == false' "$prot_file" >/dev/null || fail "Branch deletion must be blocked on ${branch}"
+
+            local contexts
+            contexts="$(jq -r '.required_status_checks.contexts[]?' "$prot_file")"
+            while IFS= read -r check; do
+              [ -n "$check" ] || continue
+              echo "$contexts" | grep -Fx "$check" >/dev/null || fail "Required check '${check}' missing on ${branch}"
+            done <<< "$expected"
+
+            local sig_code
+            sig_code="$(api_get_best_effort "/branches/${branch}/protection/required_signatures" "$sig_file")"
+            if [ "$sig_code" != "200" ]; then
+              warn "Best-effort signature check skipped for ${branch}: HTTP ${sig_code}"
+              return 0
+            fi
+            jq -e '.enabled == true' "$sig_file" >/dev/null || fail "Signed commits must be required on ${branch}"
+
+            echo "Protection check passed for ${branch}"
+          }
+
+          echo "Checking working tree cleanliness"
+          [ -z "$(git status --porcelain)" ] || fail "Repository is not clean at release time"
+
+          echo "Checking tag signature verification for ${TAG_NAME}"
+          ref_json="$(api_get "/git/ref/tags/${TAG_NAME}")"
+          ref_type="$(echo "$ref_json" | jq -r '.object.type')"
+          ref_sha="$(echo "$ref_json" | jq -r '.object.sha')"
+
+          [ "$ref_type" = "tag" ] || fail "Tag ${TAG_NAME} is lightweight; signed annotated tags are required"
+
+          tag_json="$(api_get "/git/tags/${ref_sha}")"
+          verified="$(echo "$tag_json" | jq -r '.verification.verified')"
+          reason="$(echo "$tag_json" | jq -r '.verification.reason')"
+          [ "$verified" = "true" ] || fail "Tag ${TAG_NAME} is not verified (reason: ${reason})"
+
+          echo "Checking required branch protections (best-effort via API)"
+          check_branch_protection master
+
+  draft-release:
+    runs-on: ubuntu-latest
+    needs: release-guard
+    steps:
+      - name: Create or update draft release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ github.ref_name }}
+          draft: true
+          generateReleaseNotes: true
+          allowUpdates: true
