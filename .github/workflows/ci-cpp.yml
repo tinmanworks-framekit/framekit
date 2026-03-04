@@ -21,3 +21,26 @@ jobs:
 
       - name: Test
         run: ctest --test-dir build --output-on-failure
+
+  framekit-with-netkit:
+    name: FrameKit + NetKit ShmPipe
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout framekit
+        uses: actions/checkout@v4
+
+      - name: Checkout netkit
+        uses: actions/checkout@v4
+        with:
+          repository: tinmanworks-framekit/netkit
+          path: netkit
+
+      - name: Configure
+        run: cmake -S . -B build -DFRAMEKIT_BUILD_TESTS=ON -DFRAMEKIT_BUILD_EXAMPLES=ON -DFRAMEKIT_ENABLE_NETKIT=ON -DFRAMEKIT_NETKIT_SOURCE_DIR=${{ github.workspace }}/netkit -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
