@@ -71,7 +71,23 @@ int main() {
     assert(runtime.Start());
     assert(runtime.IsRunning());
     assert(runtime.ChildProcesses().size() == 1);
-    assert(runtime.ChildProcesses().front().role == framekit::ProcessRole::kBackend);
+    const auto child = runtime.ChildProcesses().front();
+    assert(child.role == framekit::ProcessRole::kBackend);
+
+    const auto handshake = runtime.ChildHandshake(child.process_id);
+    assert(handshake.has_value());
+    assert(handshake->state == framekit::runtime::ChildHandshakeState::kSpawned);
+
+    runtime.SetChildHandshakeState(
+        child.process_id,
+        framekit::runtime::ChildHandshakeState::kReady,
+        "ready-signal");
+    const auto updated = runtime.ChildHandshake(child.process_id);
+    assert(updated.has_value());
+    assert(updated->state == framekit::runtime::ChildHandshakeState::kReady);
+    assert(updated->detail == "ready-signal");
+
+    assert(runtime.AllChildHandshakes().size() == 1);
     runtime.Stop();
     assert(!runtime.IsRunning());
 

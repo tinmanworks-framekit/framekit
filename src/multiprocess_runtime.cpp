@@ -36,10 +36,12 @@ void MultiprocessRuntime::Tick() {
 void MultiprocessRuntime::Stop() {
     running_ = false;
     child_processes_.clear();
+    child_handshakes_.clear();
 }
 
 bool MultiprocessRuntime::LaunchChildren() {
     child_processes_.clear();
+    child_handshakes_.clear();
     if (!process_launcher_) {
         return spec_.process_topology.nodes.empty();
     }
@@ -59,9 +61,45 @@ bool MultiprocessRuntime::LaunchChildren() {
             return false;
         }
         child_processes_.push_back(launched->identity);
+        SetChildHandshakeState(launched->identity.process_id, ChildHandshakeState::kSpawned);
     }
 
     return true;
+}
+
+void MultiprocessRuntime::SetChildHandshakeState(
+    std::uint64_t process_id,
+    ChildHandshakeState state,
+    std::string detail) {
+    auto it = child_handshakes_.find(process_id);
+    if (it == child_handshakes_.end()) {
+        ChildHandshakeStatus status;
+        status.child.process_id = process_id;
+        status.state = state;
+        status.detail = std::move(detail);
+        child_handshakes_.emplace(process_id, std::move(status));
+        return;
+    }
+
+    it->second.state = state;
+    it->second.detail = std::move(detail);
+}
+
+std::optional<ChildHandshakeStatus> MultiprocessRuntime::ChildHandshake(std::uint64_t process_id) const {
+    const auto it = child_handshakes_.find(process_id);
+    if (it == child_handshakes_.end()) {
+        return std::nullopt;
+    }
+    return it->second;
+}
+
+std::vector<ChildHandshakeStatus> MultiprocessRuntime::AllChildHandshakes() const {
+    std::vector<ChildHandshakeStatus> statuses;
+    statuses.reserve(child_handshakes_.size());
+    for (const auto& item : child_handshakes_) {
+        statuses.push_back(item.second);
+    }
+    return statuses;
 }
 
 } // namespace framekit::runtime
