@@ -40,6 +40,42 @@ private:
     std::vector<framekit::ProcessIdentity> running_;
 };
 
+class FakeSupervisorPolicy : public framekit::runtime::ISupervisorPolicy {
+public:
+    bool ShouldRestart(const framekit::ProcessIdentity& identity, int exit_code) override {
+        (void)identity;
+        (void)exit_code;
+        return false;
+    }
+
+    void OnHeartbeatMissed(const framekit::ProcessIdentity& identity) override {
+        missed_heartbeat_ids.push_back(identity.process_id);
+    }
+
+    void OnStopped(const framekit::ProcessIdentity& identity) override {
+        stopped_ids.push_back(identity.process_id);
+    }
+
+    std::vector<std::uint64_t> missed_heartbeat_ids;
+    std::vector<std::uint64_t> stopped_ids;
+};
+
+class FakeLivenessPolicy : public framekit::runtime::ILivenessPolicy {
+public:
+    void OnHeartbeat(const framekit::runtime::HeartbeatEvent& event) override {
+        heartbeat_ids.push_back(event.child.process_id);
+    }
+
+    bool IsProcessAlive(
+        const framekit::ProcessIdentity& identity,
+        std::uint64_t observed_heartbeat_count) const override {
+        (void)identity;
+        return observed_heartbeat_count > 0;
+    }
+
+    std::vector<std::uint64_t> heartbeat_ids;
+};
+
 } // namespace
 
 int main() {
@@ -65,8 +101,12 @@ int main() {
     multiprocess_spec.process_topology.nodes.push_back(backend_spec);
 
     auto launcher = std::make_shared<FakeProcessLauncher>();
+    auto supervisor = std::make_shared<FakeSupervisorPolicy>();
+    auto liveness = std::make_shared<FakeLivenessPolicy>();
     runtime.Configure(multiprocess_spec);
     runtime.SetProcessLauncher(launcher);
+    runtime.SetSupervisorPolicy(supervisor);
+    runtime.SetLivenessPolicy(liveness);
 
     assert(runtime.Start());
     assert(runtime.IsRunning());
@@ -88,6 +128,19 @@ int main() {
     assert(updated->detail == "ready-signal");
 
     assert(runtime.AllChildHandshakes().size() == 1);
+
+    runtime.Tick();
+    assert(supervisor->missed_heartbeat_ids.size() == 1);
+    assert(supervisor->missed_heartbeat_ids.front() == child.process_id);
+
+    runtime.RecordHeartbeat(child.process_id, 1);
+    assert(runtime.HeartbeatCount(child.process_id) == 1);
+    assert(liveness->heartbeat_ids.size() == 1);
+    assert(liveness->heartbeat_ids.front() == child.process_id);
+
+    runtime.Tick();
+    assert(supervisor->missed_heartbeat_ids.size() == 1);
+
     runtime.Stop();
     assert(!runtime.IsRunning());
 
