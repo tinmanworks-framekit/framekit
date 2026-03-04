@@ -20,5 +20,9 @@ This repository follows Tinman Doctrine.
    - Avoid secrets in commits and docs
 4. Delivery quality bar:
    - Keep changes small and focused
+   - If work is tracked in GitHub Projects, implement only against a clear issue
+   - Prefer small, unambiguous issues; split broad tasks into manageable subtasks
+   - Keep commits small and issue-scoped; default to one issue -> one small commit set
+   - Exceptions are allowed for non-diff tasks, discovery-first work, or unavoidable architecture-level changes; document rationale in the issue or PR
    - Ensure lint/tests/build pass for touched areas
 5. If local repo policy conflicts with doctrine snapshot, follow local repo files and call out the conflict explicitly.

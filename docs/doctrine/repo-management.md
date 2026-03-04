@@ -1,7 +1,7 @@
 # Repo Governance Doctrine
 
 Status: Stable  
-Last Reviewed: 2026-02-28
+Last Reviewed: 2026-03-04
 
 ## Scope
 
@@ -18,8 +18,9 @@ This is policy and doctrine, not automation.
 
 1. Commit signing policy
 2. Commit message policy
-3. Repo placement policy (Personal vs Organization)
-4. Visibility policy (Public vs Private vs Internal)
+3. GitHub Projects issue and commit granularity policy
+4. Repo placement policy (Personal vs Organization)
+5. Visibility policy (Public vs Private vs Internal)
 
 ## Commit Signing Policy
 
@@ -125,6 +126,56 @@ For important repositories (templates, core libs, product repos), enforce both:
 
 - Signed commits
 - CI or hook-based commit message linting against this policy
+
+## GitHub Projects Issue and Commit Granularity Policy
+
+### Applicability
+
+Mandatory when a repository is associated with a GitHub Project used for planning and execution.
+Advisory (not mandatory) for playground/experimental repositories that are not project-managed.
+
+### Required outcome
+
+- Work is issue-driven when the repo is project-managed.
+- Issues are small, specific, and unambiguous.
+- Commits are small and manageable by default.
+- Feature/fix/refactor delivery remains traceable from issue to implementation.
+
+### Issue definition rules
+
+- Define issue scope clearly (what to change and what is out of scope).
+- State expected result and completion criteria.
+- Avoid broad issue titles/descriptions that hide implementation decisions.
+- Split large work (feature, fix, refactor) into manageable issues or subtasks.
+- If an issue starts broad (research/discovery), split it into concrete sub-issues once implementation paths are known.
+
+### Issue-to-commit mapping
+
+- Default mapping: one issue -> one small commit set.
+- A commit set may contain multiple commits, but commits must remain within one issue scope.
+- Keep commit units logically staged and reviewable.
+- Reference the issue in commits/PRs where repository conventions support it.
+
+### Exceptions
+
+- Non-diff operational issues (for example, external settings or service configuration) may be completed without a repository commit.
+- Discovery-first issues may begin broad before decomposition.
+- Unavoidable architecture-level changes may require a larger commit set.
+- Even when larger changes are required, stage commits logically and document rationale in the issue or PR.
+
+### Execution gating
+
+- For project-managed repos, do not implement ad-hoc work without a corresponding issue.
+- Create or refine the issue first, then implement.
+- Close issues only after acceptance criteria are met.
+
+### Enforcement baseline
+
+For important repositories (templates, core libs, product repos), enforce:
+
+- GitHub Projects usage discipline (work tracked by issues)
+- Issue templates that require scope + expected result + completion criteria
+- PR or CI checks that encourage issue linkage where feasible
 
 ## Repo Placement Policy (Personal vs Organization)
 
