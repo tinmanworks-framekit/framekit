@@ -6,3 +6,4 @@ Current baseline includes:
 - process role and topology contracts
 - transport-selection contracts
 - multiprocess runtime skeleton
+- selective-linking guidance for optional module usage
