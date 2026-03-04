@@ -69,6 +69,7 @@ For important repositories (templates, core libs, product repos), enable:
 - Require status checks to pass
 - Restrict who can push (optional)
 - Require linear history (optional)
+- Do not allow admin bypass on protected branch rules
 
 If using an organization, prefer organization rulesets over per-repo configuration.
 
@@ -245,24 +246,44 @@ This section applies only to this Doctrine repository.
 
 ### Branch model
 
+- `master` -> stable release branch
 - `develop` -> integration branch for ongoing changes
-- `master` -> stable branch for promoted releases
-- `feature/*` -> short-lived heavy refactor branches
+- `feature/*` -> short-lived implementation branches merged into `develop`
+- `fix/*` -> short-lived bugfix branches merged into `develop`
+- `release/*` -> short-lived release stabilization branches cut from `develop`
 
 ### Release process
 
-1. Ensure release-ready work is merged into `develop`.
-2. Promote `develop` to `master` using a PR with base `master` and head `develop`.
-3. Merge only after required checks pass.
-4. Create signed tag on `master`:
-   - `git tag -s vX.Y -m "Release vX.Y"`
-5. Push `master` and tag:
+1. Ensure release-ready work is merged into `develop` via PRs from feature/fix branches.
+2. Create release branch from `develop`:
+   - `git checkout -b release/vX.Y.Z develop`
+3. Apply final stabilization updates on `release/*` (final fixes, docs, changelog/release notes, version touches).
+4. Promote release to stable via PR with base `master` and head `release/*`.
+5. After merge to `master`, back-propagate identical release changes via PR with base `develop` and head `release/*`.
+6. Merge only after required checks pass on both PRs.
+7. Create signed tag on `master`:
+   - `git tag -s vX.Y.Z -m "Release vX.Y.Z"`
+8. Push `master` and tag:
    - `git push origin master`
-   - `git push origin vX.Y`
-6. If tag was created unsigned by mistake, recreate it as signed on the same commit and force-push:
+   - `git push origin vX.Y.Z`
+9. Delete the short-lived release branch after both merges complete.
+10. If tag was created unsigned by mistake, recreate it as signed on the same commit and force-push:
    - `git tag -d vX.Y`
    - `git tag -s vX.Y -m "Release vX.Y" <release-commit>`
    - `git push --force origin vX.Y`
+
+### Protected branch behavior
+
+- No direct pushes to `master` or `develop`.
+- All changes to protected branches must arrive through pull requests.
+- Protected branch rules apply to admins and automation identities as well (no bypass).
+- PRs targeting `master` must come from `release/*` branches.
+
+### Emergency hotfix rule
+
+- If an emergency requires immediate stabilization, use `release/hotfix-*` branch naming.
+- Merge `release/hotfix-*` to `master` first, then merge the same branch to `develop`.
+- Keep the same signed-commit and signed-tag requirements.
 
 ### Document status model
 
