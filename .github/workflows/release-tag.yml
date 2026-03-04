@@ -72,7 +72,7 @@ jobs:
             local prot_file sig_file
             prot_file="$(mktemp)"
             sig_file="$(mktemp)"
-            trap 'rm -f "$prot_file" "$sig_file"' EXIT
+            trap 'rm -f "${prot_file:-}" "${sig_file:-}"' EXIT
 
             local prot_code
             prot_code="$(api_get_best_effort "/branches/${branch}/protection" "$prot_file")"
