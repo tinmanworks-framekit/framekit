@@ -1,0 +1,29 @@
+name: CI (Master Promotion)
+
+on:
+  pull_request_target:
+    branches:
+      - master
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - edited
+      - ready_for_review
+
+jobs:
+  master-promotion:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce master source branch
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          set -euo pipefail
+          [ "$BASE_REF" = "master" ] || exit 0
+          if [[ ! "$HEAD_REF" =~ ^release/ ]]; then
+            echo "::error::PRs targeting master must come from release/* branches. Found head branch: $HEAD_REF"
+            exit 1
+          fi
+          echo "master promotion rule satisfied: $HEAD_REF -> $BASE_REF"
