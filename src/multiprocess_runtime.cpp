@@ -18,6 +18,10 @@ void MultiprocessRuntime::SetLivenessPolicy(std::shared_ptr<ILivenessPolicy> pol
     liveness_policy_ = std::move(policy);
 }
 
+void MultiprocessRuntime::SetLifecycleHooks(std::shared_ptr<ILifecycleHooks> hooks) {
+    lifecycle_hooks_ = std::move(hooks);
+}
+
 bool MultiprocessRuntime::Start() {
     if (running_) {
         return false;
@@ -47,6 +51,16 @@ void MultiprocessRuntime::Tick() {
 }
 
 void MultiprocessRuntime::Stop() {
+    std::vector<std::uint64_t> process_ids;
+    process_ids.reserve(child_processes_.size());
+    for (const auto& child : child_processes_) {
+        process_ids.push_back(child.process_id);
+    }
+
+    for (const auto process_id : process_ids) {
+        (void)GracefulStopChild(process_id);
+    }
+
     running_ = false;
     child_processes_.clear();
     child_handshakes_.clear();
@@ -142,6 +156,117 @@ std::uint64_t MultiprocessRuntime::HeartbeatCount(std::uint64_t process_id) cons
         return 0;
     }
     return it->second;
+}
+
+bool MultiprocessRuntime::GracefulStopChild(std::uint64_t process_id) {
+    if (!process_launcher_) {
+        return false;
+    }
+
+    for (auto it = child_processes_.begin(); it != child_processes_.end(); ++it) {
+        if (it->process_id != process_id) {
+            continue;
+        }
+
+        const auto identity = *it;
+        if (lifecycle_hooks_) {
+            lifecycle_hooks_->OnGracefulStopRequested(identity);
+        }
+
+        const bool stopped = process_launcher_->StopChild(identity);
+        if (supervisor_policy_) {
+            supervisor_policy_->OnStopped(identity);
+        }
+
+        if (lifecycle_hooks_) {
+            lifecycle_hooks_->OnGracefulStopCompleted(identity, stopped);
+        }
+
+        if (!stopped) {
+            return false;
+        }
+
+        child_processes_.erase(it);
+        child_handshakes_.erase(identity.process_id);
+        heartbeat_counters_.erase(identity.process_id);
+        return true;
+    }
+
+    return false;
+}
+
+bool MultiprocessRuntime::RestartChild(std::uint64_t process_id) {
+    for (const auto& child : child_processes_) {
+        if (child.process_id != process_id) {
+            continue;
+        }
+        return RelaunchChild(child);
+    }
+    return false;
+}
+
+bool MultiprocessRuntime::RelaunchChild(const framekit::ProcessIdentity& old_identity) {
+    if (!process_launcher_) {
+        return false;
+    }
+
+    if (lifecycle_hooks_) {
+        lifecycle_hooks_->OnRestartRequested(old_identity);
+    }
+
+    if (!process_launcher_->StopChild(old_identity)) {
+        if (lifecycle_hooks_) {
+            lifecycle_hooks_->OnRestartCompleted(old_identity, old_identity, false);
+        }
+        return false;
+    }
+
+    for (auto it = child_processes_.begin(); it != child_processes_.end(); ++it) {
+        if (it->process_id != old_identity.process_id) {
+            continue;
+        }
+
+        framekit::ProcessIdentity parent_identity;
+        parent_identity.role = framekit::ProcessRole::kPrimary;
+        parent_identity.role_name = "primary";
+        parent_identity.process_id = 1;
+
+        for (const auto& spec : spec_.process_topology.nodes) {
+            if (spec.name != old_identity.role_name || spec.role != old_identity.role) {
+                continue;
+            }
+
+            auto relaunched = process_launcher_->LaunchChild(parent_identity, spec);
+            if (!relaunched.has_value() || !relaunched->running) {
+                if (lifecycle_hooks_) {
+                    lifecycle_hooks_->OnRestartCompleted(old_identity, old_identity, false);
+                }
+                return false;
+            }
+
+            const auto new_identity = relaunched->identity;
+            *it = new_identity;
+
+            child_handshakes_.erase(old_identity.process_id);
+            child_handshakes_[new_identity.process_id] = ChildHandshakeStatus{
+                .child = new_identity,
+                .state = ChildHandshakeState::kSpawned,
+                .detail = {}};
+
+            heartbeat_counters_.erase(old_identity.process_id);
+            heartbeat_counters_[new_identity.process_id] = 0;
+
+            if (lifecycle_hooks_) {
+                lifecycle_hooks_->OnRestartCompleted(old_identity, new_identity, true);
+            }
+            return true;
+        }
+    }
+
+    if (lifecycle_hooks_) {
+        lifecycle_hooks_->OnRestartCompleted(old_identity, old_identity, false);
+    }
+    return false;
 }
 
 } // namespace framekit::runtime

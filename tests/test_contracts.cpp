@@ -76,6 +76,40 @@ public:
     std::vector<std::uint64_t> heartbeat_ids;
 };
 
+class FakeLifecycleHooks : public framekit::runtime::ILifecycleHooks {
+public:
+    void OnGracefulStopRequested(const framekit::ProcessIdentity& identity) override {
+        stop_requested_ids.push_back(identity.process_id);
+    }
+
+    void OnGracefulStopCompleted(const framekit::ProcessIdentity& identity, bool stopped) override {
+        (void)identity;
+        if (stopped) {
+            stop_completed += 1;
+        }
+    }
+
+    void OnRestartRequested(const framekit::ProcessIdentity& identity) override {
+        restart_requested_ids.push_back(identity.process_id);
+    }
+
+    void OnRestartCompleted(
+        const framekit::ProcessIdentity& old_identity,
+        const framekit::ProcessIdentity& new_identity,
+        bool restarted) override {
+        if (restarted) {
+            restart_from_ids.push_back(old_identity.process_id);
+            restart_to_ids.push_back(new_identity.process_id);
+        }
+    }
+
+    int stop_completed = 0;
+    std::vector<std::uint64_t> stop_requested_ids;
+    std::vector<std::uint64_t> restart_requested_ids;
+    std::vector<std::uint64_t> restart_from_ids;
+    std::vector<std::uint64_t> restart_to_ids;
+};
+
 } // namespace
 
 int main() {
@@ -103,10 +137,12 @@ int main() {
     auto launcher = std::make_shared<FakeProcessLauncher>();
     auto supervisor = std::make_shared<FakeSupervisorPolicy>();
     auto liveness = std::make_shared<FakeLivenessPolicy>();
+    auto lifecycle = std::make_shared<FakeLifecycleHooks>();
     runtime.Configure(multiprocess_spec);
     runtime.SetProcessLauncher(launcher);
     runtime.SetSupervisorPolicy(supervisor);
     runtime.SetLivenessPolicy(liveness);
+    runtime.SetLifecycleHooks(lifecycle);
 
     assert(runtime.Start());
     assert(runtime.IsRunning());
@@ -140,6 +176,21 @@ int main() {
 
     runtime.Tick();
     assert(supervisor->missed_heartbeat_ids.size() == 1);
+
+    assert(runtime.RestartChild(child.process_id));
+    assert(lifecycle->restart_requested_ids.size() == 1);
+    assert(lifecycle->restart_requested_ids.front() == child.process_id);
+    assert(lifecycle->restart_from_ids.size() == 1);
+    assert(lifecycle->restart_to_ids.size() == 1);
+    assert(lifecycle->restart_to_ids.front() != child.process_id);
+    assert(runtime.ChildProcesses().size() == 1);
+
+    const auto restarted_child = runtime.ChildProcesses().front();
+    assert(runtime.GracefulStopChild(restarted_child.process_id));
+    assert(lifecycle->stop_requested_ids.size() == 1);
+    assert(lifecycle->stop_requested_ids.front() == restarted_child.process_id);
+    assert(lifecycle->stop_completed == 1);
+    assert(runtime.ChildProcesses().empty());
 
     runtime.Stop();
     assert(!runtime.IsRunning());

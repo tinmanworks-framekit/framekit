@@ -2,6 +2,7 @@
 
 #include "framekit/application_spec.hpp"
 #include "framekit/runtime/child_handshake.hpp"
+#include "framekit/runtime/lifecycle_hooks.hpp"
 #include "framekit/runtime/liveness_policy.hpp"
 #include "framekit/runtime/process_launcher.hpp"
 #include "framekit/runtime/supervisor_policy.hpp"
@@ -22,10 +23,13 @@ public:
     void SetSupervisorPolicy(std::shared_ptr<ISupervisorPolicy> policy);
     void SetProcessLauncher(std::shared_ptr<IProcessLauncher> launcher);
     void SetLivenessPolicy(std::shared_ptr<ILivenessPolicy> policy);
+    void SetLifecycleHooks(std::shared_ptr<ILifecycleHooks> hooks);
 
     bool Start();
     void Tick();
     void Stop();
+    bool GracefulStopChild(std::uint64_t process_id);
+    bool RestartChild(std::uint64_t process_id);
 
     bool IsRunning() const { return running_; }
     const std::vector<framekit::ProcessIdentity>& ChildProcesses() const { return child_processes_; }
@@ -42,11 +46,13 @@ public:
 
 private:
     bool LaunchChildren();
+    bool RelaunchChild(const framekit::ProcessIdentity& old_identity);
 
     framekit::ApplicationSpec spec_;
     std::shared_ptr<ISupervisorPolicy> supervisor_policy_;
     std::shared_ptr<IProcessLauncher> process_launcher_;
     std::shared_ptr<ILivenessPolicy> liveness_policy_;
+    std::shared_ptr<ILifecycleHooks> lifecycle_hooks_;
     std::vector<framekit::ProcessIdentity> child_processes_;
     std::unordered_map<std::uint64_t, ChildHandshakeStatus> child_handshakes_;
     std::unordered_map<std::uint64_t, std::uint64_t> heartbeat_counters_;
