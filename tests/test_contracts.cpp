@@ -1,10 +1,23 @@
 #include "framekit/framekit.hpp"
 
-#include <cassert>
+#include <cstdlib>
 #include <cstdint>
+#include <iostream>
 #include <memory>
 
 namespace {
+
+[[noreturn]] void FailRequirement(const char* expr, int line) {
+    std::cerr << "Requirement failed at line " << line << ": " << expr << '\n';
+    std::abort();
+}
+
+#define REQUIRE(expr)            \
+    do {                         \
+        if (!(expr)) {           \
+            FailRequirement(#expr, __LINE__); \
+        }                        \
+    } while (false)
 
 class FakeProcessLauncher : public framekit::runtime::IProcessLauncher {
 public:
@@ -114,16 +127,16 @@ public:
 
 int main() {
     framekit::ApplicationSpec single_spec;
-    assert(single_spec.mode == framekit::AppMode::kSingleProcess);
-    assert(single_spec.transport_kind == framekit::IpcTransportKind::kNone);
+    REQUIRE(single_spec.mode == framekit::AppMode::kSingleProcess);
+    REQUIRE(single_spec.transport_kind == framekit::IpcTransportKind::kNone);
 
     framekit::runtime::MultiprocessRuntime runtime;
     runtime.Configure(single_spec);
 
-    assert(runtime.Start());
-    assert(runtime.IsRunning());
+    REQUIRE(runtime.Start());
+    REQUIRE(runtime.IsRunning());
     runtime.Stop();
-    assert(!runtime.IsRunning());
+    REQUIRE(!runtime.IsRunning());
 
     framekit::ApplicationSpec multiprocess_spec;
     multiprocess_spec.mode = framekit::AppMode::kMultiProcess;
@@ -144,56 +157,56 @@ int main() {
     runtime.SetLivenessPolicy(liveness);
     runtime.SetLifecycleHooks(lifecycle);
 
-    assert(runtime.Start());
-    assert(runtime.IsRunning());
-    assert(runtime.ChildProcesses().size() == 1);
+    REQUIRE(runtime.Start());
+    REQUIRE(runtime.IsRunning());
+    REQUIRE(runtime.ChildProcesses().size() == 1);
     const auto child = runtime.ChildProcesses().front();
-    assert(child.role == framekit::ProcessRole::kBackend);
+    REQUIRE(child.role == framekit::ProcessRole::kBackend);
 
     const auto handshake = runtime.ChildHandshake(child.process_id);
-    assert(handshake.has_value());
-    assert(handshake->state == framekit::runtime::ChildHandshakeState::kSpawned);
+    REQUIRE(handshake.has_value());
+    REQUIRE(handshake->state == framekit::runtime::ChildHandshakeState::kSpawned);
 
     runtime.SetChildHandshakeState(
         child.process_id,
         framekit::runtime::ChildHandshakeState::kReady,
         "ready-signal");
     const auto updated = runtime.ChildHandshake(child.process_id);
-    assert(updated.has_value());
-    assert(updated->state == framekit::runtime::ChildHandshakeState::kReady);
-    assert(updated->detail == "ready-signal");
+    REQUIRE(updated.has_value());
+    REQUIRE(updated->state == framekit::runtime::ChildHandshakeState::kReady);
+    REQUIRE(updated->detail == "ready-signal");
 
-    assert(runtime.AllChildHandshakes().size() == 1);
+    REQUIRE(runtime.AllChildHandshakes().size() == 1);
 
     runtime.Tick();
-    assert(supervisor->missed_heartbeat_ids.size() == 1);
-    assert(supervisor->missed_heartbeat_ids.front() == child.process_id);
+    REQUIRE(supervisor->missed_heartbeat_ids.size() == 1);
+    REQUIRE(supervisor->missed_heartbeat_ids.front() == child.process_id);
 
     runtime.RecordHeartbeat(child.process_id, 1);
-    assert(runtime.HeartbeatCount(child.process_id) == 1);
-    assert(liveness->heartbeat_ids.size() == 1);
-    assert(liveness->heartbeat_ids.front() == child.process_id);
+    REQUIRE(runtime.HeartbeatCount(child.process_id) == 1);
+    REQUIRE(liveness->heartbeat_ids.size() == 1);
+    REQUIRE(liveness->heartbeat_ids.front() == child.process_id);
 
     runtime.Tick();
-    assert(supervisor->missed_heartbeat_ids.size() == 1);
+    REQUIRE(supervisor->missed_heartbeat_ids.size() == 1);
 
-    assert(runtime.RestartChild(child.process_id));
-    assert(lifecycle->restart_requested_ids.size() == 1);
-    assert(lifecycle->restart_requested_ids.front() == child.process_id);
-    assert(lifecycle->restart_from_ids.size() == 1);
-    assert(lifecycle->restart_to_ids.size() == 1);
-    assert(lifecycle->restart_to_ids.front() != child.process_id);
-    assert(runtime.ChildProcesses().size() == 1);
+    REQUIRE(runtime.RestartChild(child.process_id));
+    REQUIRE(lifecycle->restart_requested_ids.size() == 1);
+    REQUIRE(lifecycle->restart_requested_ids.front() == child.process_id);
+    REQUIRE(lifecycle->restart_from_ids.size() == 1);
+    REQUIRE(lifecycle->restart_to_ids.size() == 1);
+    REQUIRE(lifecycle->restart_to_ids.front() != child.process_id);
+    REQUIRE(runtime.ChildProcesses().size() == 1);
 
     const auto restarted_child = runtime.ChildProcesses().front();
-    assert(runtime.GracefulStopChild(restarted_child.process_id));
-    assert(lifecycle->stop_requested_ids.size() == 1);
-    assert(lifecycle->stop_requested_ids.front() == restarted_child.process_id);
-    assert(lifecycle->stop_completed == 1);
-    assert(runtime.ChildProcesses().empty());
+    REQUIRE(runtime.GracefulStopChild(restarted_child.process_id));
+    REQUIRE(lifecycle->stop_requested_ids.size() == 1);
+    REQUIRE(lifecycle->stop_requested_ids.front() == restarted_child.process_id);
+    REQUIRE(lifecycle->stop_completed == 1);
+    REQUIRE(runtime.ChildProcesses().empty());
 
     runtime.Stop();
-    assert(!runtime.IsRunning());
+    REQUIRE(!runtime.IsRunning());
 
     return 0;
 }
