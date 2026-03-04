@@ -10,3 +10,5 @@
 #include "framekit/runtime/lifecycle_hooks.hpp"
 #include "framekit/runtime/liveness_policy.hpp"
 #include "framekit/runtime/process_launcher.hpp"
+#include "framekit/window/cocoa_backend.hpp"
+#include "framekit/window/window_backend.hpp"

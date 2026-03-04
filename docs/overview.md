@@ -6,4 +6,5 @@ Current baseline includes:
 - process role and topology contracts
 - transport-selection contracts
 - multiprocess runtime skeleton
+- window backend contracts and Cocoa backend module
 - selective-linking guidance for optional module usage
