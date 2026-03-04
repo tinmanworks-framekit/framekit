@@ -1,0 +1,24 @@
+name: CI (Issue Link)
+
+on:
+  pull_request_target:
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  issue-link:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate issue linkage
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+          content="$PR_TITLE
+          $PR_BODY"
+          if echo "$content" | grep -E '(#[0-9]+|/issues/[0-9]+)' >/dev/null 2>&1; then
+            echo "Issue reference detected"
+            exit 0
+          fi
+          echo "PR must reference at least one issue (example: #123 or full issue URL)."
+          exit 1
