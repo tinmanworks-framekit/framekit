@@ -16,6 +16,23 @@ void KernelRuntime::SetModuleStopHandler(ModuleStopHandler handler) {
     module_stop_handler_ = std::move(handler);
 }
 
+bool KernelRuntime::ConfigureModules(std::vector<ModuleSpec> modules) {
+    modules_configured_ = true;
+    module_graph_validation_ = ValidateModuleGraph(modules);
+    configured_module_startup_order_.clear();
+
+    if (!module_graph_validation_.valid) {
+        return false;
+    }
+
+    configured_module_startup_order_ = module_graph_validation_.startup_order;
+    return true;
+}
+
+void KernelRuntime::SetModuleLifecycleHandler(ModuleLifecycleHandler handler) {
+    module_lifecycle_handler_ = std::move(handler);
+}
+
 void KernelRuntime::SetDiagnosticsFlushStep(DiagnosticsFlushStep step) {
     diagnostics_flush_step_ = std::move(step);
 }
@@ -40,6 +57,7 @@ void KernelRuntime::AddPlatformTeardownStep(std::string name, PlatformTeardownSt
 
 void KernelRuntime::RecordStartedModules(std::vector<std::string> startup_order) {
     started_modules_ = std::move(startup_order);
+    last_module_startup_order_ = started_modules_;
 }
 
 bool KernelRuntime::Start() {
@@ -69,6 +87,11 @@ bool KernelRuntime::Start() {
 
     if (!services_.Freeze()) {
         Fault("service context freeze failed");
+        return false;
+    }
+
+    if (!ExecuteModuleStartupSequence()) {
+        Fault(last_fault_reason_.empty() ? "module startup sequence failed" : last_fault_reason_);
         return false;
     }
 
@@ -122,12 +145,24 @@ const ServiceContext& KernelRuntime::Services() const {
     return services_;
 }
 
+const std::vector<std::string>& KernelRuntime::LastModuleStartupOrder() const {
+    return last_module_startup_order_;
+}
+
 const std::vector<std::string>& KernelRuntime::LastModuleShutdownOrder() const {
     return last_module_shutdown_order_;
 }
 
+const std::vector<std::string>& KernelRuntime::LastModuleTeardownOrder() const {
+    return last_module_teardown_order_;
+}
+
 const std::vector<std::string>& KernelRuntime::LastPlatformTeardownOrder() const {
     return last_platform_teardown_order_;
+}
+
+const ModuleGraphValidationResult& KernelRuntime::LastModuleGraphValidation() const {
+    return module_graph_validation_;
 }
 
 const std::string& KernelRuntime::LastFaultReason() const {
@@ -141,17 +176,74 @@ void KernelRuntime::Fault(std::string reason) {
     }
 }
 
+bool KernelRuntime::ExecuteModuleStartupSequence() {
+    last_module_startup_order_.clear();
+
+    if (modules_configured_) {
+        if (!module_graph_validation_.valid) {
+            if (!module_graph_validation_.errors.empty()) {
+                last_fault_reason_ = module_graph_validation_.errors.front().message;
+            } else {
+                last_fault_reason_ = "module graph validation failed";
+            }
+            return false;
+        }
+
+        started_modules_.clear();
+        if (!module_lifecycle_handler_) {
+            started_modules_ = configured_module_startup_order_;
+            last_module_startup_order_ = started_modules_;
+            return true;
+        }
+
+        for (const auto& module_id : configured_module_startup_order_) {
+            if (!module_lifecycle_handler_(module_id, ModuleLifecyclePhase::kInitialize)) {
+                last_fault_reason_ = "module initialize failed: " + module_id;
+                return false;
+            }
+
+            if (!module_lifecycle_handler_(module_id, ModuleLifecyclePhase::kStart)) {
+                last_fault_reason_ = "module start failed: " + module_id;
+                return false;
+            }
+
+            started_modules_.push_back(module_id);
+            last_module_startup_order_.push_back(module_id);
+        }
+
+        return true;
+    }
+
+    if (!started_modules_.empty()) {
+        last_module_startup_order_ = started_modules_;
+    }
+
+    return true;
+}
+
 bool KernelRuntime::ExecuteShutdownSequence() {
     bool had_failure = false;
 
     last_module_shutdown_order_.clear();
+    last_module_teardown_order_.clear();
     for (auto it = started_modules_.rbegin(); it != started_modules_.rend(); ++it) {
         last_module_shutdown_order_.push_back(*it);
 
-        if (module_stop_handler_ && !module_stop_handler_(*it)) {
+        if (module_lifecycle_handler_) {
+            if (!module_lifecycle_handler_(*it, ModuleLifecyclePhase::kStop)) {
+                had_failure = true;
+            }
+
+            last_module_teardown_order_.push_back(*it);
+            if (!module_lifecycle_handler_(*it, ModuleLifecyclePhase::kTeardown)) {
+                had_failure = true;
+            }
+        } else if (module_stop_handler_ && !module_stop_handler_(*it)) {
             had_failure = true;
         }
     }
+
+    started_modules_.clear();
 
     if (event_bus_) {
         switch (deferred_event_policy_) {

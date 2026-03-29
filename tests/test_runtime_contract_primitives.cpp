@@ -30,6 +30,21 @@ struct AlternateService {
     std::string name;
 };
 
+const char* ModuleLifecyclePhaseName(framekit::runtime::ModuleLifecyclePhase phase) {
+    switch (phase) {
+        case framekit::runtime::ModuleLifecyclePhase::kInitialize:
+            return "initialize";
+        case framekit::runtime::ModuleLifecyclePhase::kStart:
+            return "start";
+        case framekit::runtime::ModuleLifecyclePhase::kStop:
+            return "stop";
+        case framekit::runtime::ModuleLifecyclePhase::kTeardown:
+            return "teardown";
+    }
+
+    return "unknown";
+}
+
 void TestLifecycleStateMachine() {
     framekit::runtime::LifecycleStateMachine machine;
 
@@ -299,6 +314,9 @@ void TestKernelRuntime() {
     REQUIRE(runtime.Start());
     REQUIRE(runtime.IsRunning());
     REQUIRE(runtime.State() == framekit::runtime::LifecycleState::kRunning);
+    REQUIRE(runtime.LastModuleStartupOrder().size() == 2);
+    REQUIRE(runtime.LastModuleStartupOrder()[0] == "module-core");
+    REQUIRE(runtime.LastModuleStartupOrder()[1] == "module-app");
     REQUIRE(runtime.Services().Phase() == framekit::runtime::ServiceContextPhase::kFrozen);
     REQUIRE(!runtime.Services().Register(std::make_shared<framekit::runtime::DiagnosticsService>(), "late"));
 
@@ -332,6 +350,103 @@ void TestKernelRuntime() {
     REQUIRE(faulty.State() == framekit::runtime::LifecycleState::kStopped);
 }
 
+void TestKernelRuntimeModuleLifecycleOrchestration() {
+    const std::vector<framekit::runtime::ModuleSpec> modules = {
+        framekit::runtime::ModuleSpec{
+            .id = "frontend",
+            .required_dependencies = {"backend"},
+            .optional_dependencies = {},
+        },
+        framekit::runtime::ModuleSpec{
+            .id = "backend",
+            .required_dependencies = {},
+            .optional_dependencies = {},
+        },
+    };
+
+    framekit::runtime::KernelRuntime runtime;
+    REQUIRE(runtime.ConfigureModules(modules));
+    REQUIRE(runtime.LastModuleGraphValidation().valid);
+    REQUIRE(runtime.LastModuleGraphValidation().startup_order.size() == 2);
+
+    std::vector<std::string> lifecycle_calls;
+    runtime.SetModuleLifecycleHandler([&lifecycle_calls](
+                                         const std::string& module_id,
+                                         framekit::runtime::ModuleLifecyclePhase phase) {
+        lifecycle_calls.push_back(module_id + ":" + ModuleLifecyclePhaseName(phase));
+        return true;
+    });
+
+    REQUIRE(runtime.Start());
+    REQUIRE(runtime.State() == framekit::runtime::LifecycleState::kRunning);
+    REQUIRE(runtime.LastModuleStartupOrder().size() == 2);
+    REQUIRE(runtime.LastModuleStartupOrder()[0] == "backend");
+    REQUIRE(runtime.LastModuleStartupOrder()[1] == "frontend");
+
+    REQUIRE(runtime.Stop());
+    REQUIRE(runtime.LastModuleShutdownOrder().size() == 2);
+    REQUIRE(runtime.LastModuleShutdownOrder()[0] == "frontend");
+    REQUIRE(runtime.LastModuleShutdownOrder()[1] == "backend");
+    REQUIRE(runtime.LastModuleTeardownOrder().size() == 2);
+    REQUIRE(runtime.LastModuleTeardownOrder()[0] == "frontend");
+    REQUIRE(runtime.LastModuleTeardownOrder()[1] == "backend");
+
+    const std::vector<std::string> expected_calls = {
+        "backend:initialize",
+        "backend:start",
+        "frontend:initialize",
+        "frontend:start",
+        "frontend:stop",
+        "frontend:teardown",
+        "backend:stop",
+        "backend:teardown",
+    };
+    REQUIRE(lifecycle_calls == expected_calls);
+
+    framekit::runtime::KernelRuntime startup_failure;
+    REQUIRE(startup_failure.ConfigureModules(modules));
+
+    startup_failure.SetModuleLifecycleHandler([](
+                                                 const std::string& module_id,
+                                                 framekit::runtime::ModuleLifecyclePhase phase) {
+        if (module_id == "frontend" && phase == framekit::runtime::ModuleLifecyclePhase::kStart) {
+            return false;
+        }
+        return true;
+    });
+
+    REQUIRE(!startup_failure.Start());
+    REQUIRE(startup_failure.State() == framekit::runtime::LifecycleState::kFaulted);
+    REQUIRE(startup_failure.LastFaultReason().find("module start failed: frontend") != std::string::npos);
+    REQUIRE(startup_failure.LastModuleStartupOrder().size() == 1);
+    REQUIRE(startup_failure.LastModuleStartupOrder()[0] == "backend");
+    REQUIRE(startup_failure.Stop());
+    REQUIRE(startup_failure.LastModuleShutdownOrder().size() == 1);
+    REQUIRE(startup_failure.LastModuleShutdownOrder()[0] == "backend");
+
+    framekit::runtime::KernelRuntime invalid_graph;
+    REQUIRE(!invalid_graph.ConfigureModules({
+        framekit::runtime::ModuleSpec{
+            .id = "feature",
+            .required_dependencies = {"missing"},
+            .optional_dependencies = {},
+        },
+    }));
+
+    invalid_graph.SetModuleLifecycleHandler([](
+                                               const std::string& module_id,
+                                               framekit::runtime::ModuleLifecyclePhase phase) {
+        (void)module_id;
+        (void)phase;
+        return true;
+    });
+
+    REQUIRE(!invalid_graph.Start());
+    REQUIRE(invalid_graph.State() == framekit::runtime::LifecycleState::kFaulted);
+    REQUIRE(invalid_graph.LastFaultReason().find("required dependency was not declared") != std::string::npos);
+    REQUIRE(invalid_graph.Stop());
+}
+
 } // namespace
 
 int main() {
@@ -341,5 +456,6 @@ int main() {
     TestModuleGraphValidation();
     TestEventBusSemantics();
     TestKernelRuntime();
+    TestKernelRuntimeModuleLifecycleOrchestration();
     return 0;
 }
