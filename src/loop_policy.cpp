@@ -60,6 +60,10 @@ LoopPolicyValidation Invalid(std::string reason) {
 } // namespace
 
 LoopPolicyValidation ValidateLoopPolicy(const LoopPolicy& policy) {
+    if (policy.timing_mode == TimingMode::kFixedDelta && policy.fixed_delta_ns == 0) {
+        return Invalid("fixed_delta timing requires fixed_delta_ns > 0");
+    }
+
     if (policy.timing_mode == TimingMode::kFixedDelta &&
         policy.overrun_mode == OverrunMode::kCatchUpBounded &&
         policy.max_catch_up_steps == 0) {

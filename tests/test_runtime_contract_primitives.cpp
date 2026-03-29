@@ -57,6 +57,12 @@ void TestLoopPolicyValidation() {
     const auto fixed_result = framekit::runtime::ValidateLoopPolicy(fixed_catch_up);
     REQUIRE(!fixed_result.valid);
 
+    framekit::runtime::LoopPolicy invalid_fixed_quantum;
+    invalid_fixed_quantum.timing_mode = framekit::runtime::TimingMode::kFixedDelta;
+    invalid_fixed_quantum.fixed_delta_ns = 0;
+    const auto invalid_fixed_quantum_result = framekit::runtime::ValidateLoopPolicy(invalid_fixed_quantum);
+    REQUIRE(!invalid_fixed_quantum_result.valid);
+
     framekit::runtime::LoopPolicy headless;
     headless.profile = framekit::runtime::LoopProfile::kHeadless;
     headless.rendering_enabled = false;

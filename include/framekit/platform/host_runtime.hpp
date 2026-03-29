@@ -5,6 +5,7 @@
 #include "framekit/loop/policy.hpp"
 #include "framekit/loop/stage_graph.hpp"
 
+#include <chrono>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -75,6 +76,8 @@ private:
     bool running_ = false;
     bool window_created_ = false;
     bool frame_failed_ = false;
+    bool has_last_tick_timestamp_ = false;
+    std::chrono::steady_clock::time_point last_tick_timestamp_{};
     std::string last_error_;
 };
 
