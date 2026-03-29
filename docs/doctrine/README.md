@@ -12,6 +12,7 @@ The canonical source remains the Doctrine repository.
 - [Release Workflow Playbook](release-playbook.md)
 - [Doctrine Governance](doctrine-governance.md)
 - [Project Board Workflow](project-board-workflow.md)
+- [Phase 0 Sign-Off Checklist and Gate](phase0-signoff-gate.md)
 
 ## Refresh
 
