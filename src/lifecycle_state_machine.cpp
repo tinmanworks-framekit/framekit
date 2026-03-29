@@ -1,4 +1,4 @@
-#include "framekit/runtime/lifecycle_state_machine.hpp"
+#include "framekit/lifecycle/state_machine.hpp"
 
 namespace framekit::runtime {
 

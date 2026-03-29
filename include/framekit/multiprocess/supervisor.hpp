@@ -1,6 +1,6 @@
 #pragma once
 
-#include "framekit/process_role.hpp"
+#include "framekit/spec/process_role.hpp"
 
 namespace framekit::runtime {
 

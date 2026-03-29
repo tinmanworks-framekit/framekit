@@ -1,7 +1,7 @@
 #pragma once
 
-#include "framekit/ipc_transport_kind.hpp"
-#include "framekit/process_topology.hpp"
+#include "framekit/spec/ipc_transport.hpp"
+#include "framekit/spec/process_topology.hpp"
 
 #include <string>
 

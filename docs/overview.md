@@ -17,4 +17,7 @@ Current baseline includes:
 - event bus immediate/deferred dispatch baseline with consume and priority semantics
 - selective-linking guidance for optional module usage
 
+Public include layout is organized by concern under `include/framekit/`:
+- `spec/`, `lifecycle/`, `loop/`, `platform/`, `input/`, `event/`, `module/`, `service/`, `fault/`, `kernel/`, `multiprocess/`, and `ipc/`
+
 For v2 scope and boundaries, see the [FrameKit v2 Charter](charter-v2.md).

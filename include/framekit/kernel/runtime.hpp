@@ -1,9 +1,9 @@
 #pragma once
 
-#include "framekit/runtime/bootstrap_services.hpp"
-#include "framekit/runtime/event_bus.hpp"
-#include "framekit/runtime/lifecycle_state_machine.hpp"
-#include "framekit/runtime/service_context.hpp"
+#include "framekit/service/bootstrap.hpp"
+#include "framekit/event/bus.hpp"
+#include "framekit/lifecycle/state_machine.hpp"
+#include "framekit/service/context.hpp"
 
 #include <cstddef>
 #include <functional>

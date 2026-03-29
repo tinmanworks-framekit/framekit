@@ -1,7 +1,7 @@
 #pragma once
 
-#include "framekit/process_role.hpp"
-#include "framekit/process_spec.hpp"
+#include "framekit/spec/process_role.hpp"
+#include "framekit/spec/process_spec.hpp"
 
 #include <optional>
 #include <vector>

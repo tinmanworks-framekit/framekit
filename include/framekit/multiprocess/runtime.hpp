@@ -1,11 +1,11 @@
 #pragma once
 
-#include "framekit/application_spec.hpp"
-#include "framekit/runtime/child_handshake.hpp"
-#include "framekit/runtime/lifecycle_hooks.hpp"
-#include "framekit/runtime/liveness_policy.hpp"
-#include "framekit/runtime/process_launcher.hpp"
-#include "framekit/runtime/supervisor_policy.hpp"
+#include "framekit/spec/app_spec.hpp"
+#include "framekit/multiprocess/handshake.hpp"
+#include "framekit/lifecycle/hooks.hpp"
+#include "framekit/multiprocess/liveness.hpp"
+#include "framekit/multiprocess/launcher.hpp"
+#include "framekit/multiprocess/supervisor.hpp"
 
 #include <memory>
 #include <optional>

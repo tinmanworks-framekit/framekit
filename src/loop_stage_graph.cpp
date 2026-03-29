@@ -1,4 +1,4 @@
-#include "framekit/runtime/loop_stage_graph.hpp"
+#include "framekit/loop/stage_graph.hpp"
 
 #include <algorithm>
 #include <cstddef>

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "framekit/runtime/lifecycle_state.hpp"
+#include "framekit/lifecycle/state.hpp"
 
 #include <vector>
 

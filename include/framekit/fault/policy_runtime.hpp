@@ -1,6 +1,6 @@
 #pragma once
 
-#include "framekit/runtime/loop_policy.hpp"
+#include "framekit/loop/policy.hpp"
 
 #include <array>
 #include <cstddef>
