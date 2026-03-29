@@ -1,6 +1,6 @@
 # Phase 0 Sign-Off Checklist and Implementation Gate
 
-Status: Draft
+Status: Stable
 Last Reviewed: 2026-03-29
 
 ## Purpose
@@ -17,6 +17,9 @@ Phase 1 is blocked unless all of the following are true:
 3. This sign-off gate records explicit approval.
 
 ## Required Phase 0 Checklist
+
+This checklist is a recorded Phase 0 completion snapshot. For future phase
+gates, copy this structure and start with unchecked items.
 
 - [x] #48 Project board workflow and required fields documented.
 - [x] #49 Doctrine-aligned issue templates added.

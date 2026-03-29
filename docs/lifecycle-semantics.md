@@ -69,5 +69,5 @@ Faulted requirements:
 ## Policy Notes
 
 - Fail-fast is required for invalid transitions and required contract failures.
-- Degrade behavior is profile-policy controlled and documented separately in the
-  error policy matrix.
+- Degrade behavior is profile-policy controlled and documented in the
+  [Error Policy Matrix by Loop Profile](error-policy-matrix.md).

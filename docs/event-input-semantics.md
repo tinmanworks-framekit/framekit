@@ -20,7 +20,8 @@ FrameKit event dispatch has two paths:
 
 - Event is delivered in the caller's execution flow.
 - Handlers execute in deterministic registration order.
-- Immediate handler failures follow configured error policy.
+- Immediate handler failures follow the
+  [Error Policy Matrix by Loop Profile](error-policy-matrix.md).
 
 ### Deferred Dispatch
 
@@ -29,6 +30,16 @@ FrameKit event dispatch has two paths:
 - Deferred events preserve FIFO ordering within the same priority class.
 - Deferred handlers observe world state after update-stage completion for the
   current frame.
+
+#### Deferred Priority Classes
+
+- A priority class is a label on a deferred event that determines relative
+  drain order.
+- Implementations must support at least one priority class: `normal`.
+- Additional classes such as `high` or `low` are optional and policy-defined.
+- Cross-priority ordering is deterministic: higher priority classes drain
+  before lower classes.
+- Within each class, events drain in FIFO enqueue order.
 
 ## Propagation and Consume Rules
 
@@ -47,8 +58,9 @@ Event propagation contract:
 Queue behavior requirements:
 
 - Queue supports bounded capacity policy per host profile.
-- Capacity overflow handling is policy-driven (drop_noncritical, fail_fast,
-  or backpressure signaling).
+- Capacity overflow handling is policy-driven
+  (`queue_drop_noncritical`, `queue_fail_fast`, or
+  `queue_backpressure_signaling`).
 - Queue drain is repeatable and observable for diagnostics.
 - Shutdown drain policy is explicit (drain all, drain bounded, or discard
   with diagnostics).

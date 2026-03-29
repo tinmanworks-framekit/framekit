@@ -10,9 +10,9 @@ profiles, including mandatory fail-fast invariants and bounded degrade limits.
 
 ## Profiles
 
-- GUI Interactive
-- Headless Service
-- Hybrid Tool
+- GUI
+- Headless
+- Hybrid
 - Deterministic Host
 
 ## Fault Classes
@@ -32,7 +32,7 @@ profiles, including mandatory fail-fast invariants and bounded degrade limits.
 
 ## Policy Matrix
 
-| Fault Class | GUI Interactive | Headless Service | Hybrid Tool | Deterministic Host |
+| Fault Class | GUI | Headless | Hybrid | Deterministic Host |
 |---|---|---|---|---|
 | Bootstrap | Fail-fast | Fail-fast | Fail-fast | Fail-fast |
 | Module | Fail-fast for required module; Degrade (bounded) for optional module | Fail-fast for required module; Degrade (bounded) for optional module | Fail-fast for required module; Degrade (bounded) for optional module | Fail-fast |
@@ -49,7 +49,8 @@ The following always require fail-fast, regardless of profile:
 2. Dependency cycle or unresolved required module dependency.
 3. Registration after service-context freeze.
 4. Corrupted event queue invariants (ordering/ownership corruption).
-5. Determinism contract breach in Deterministic Host profile.
+5. Determinism contract breach when determinism is required by the active
+  profile.
 6. Any fault that compromises safe shutdown sequencing.
 
 ## Degrade Limits
