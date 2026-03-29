@@ -191,7 +191,7 @@ void TestTickFailsOnPlatformPumpFailure() {
     REQUIRE(runtime.Stop());
 }
 
-void TestTickFailsOnWindowRenderFailure() {
+void TestTickRenderFailureDegradesThenEscalates() {
     framekit::runtime::LoopPolicy policy;
     policy.profile = framekit::runtime::LoopProfile::kGui;
     policy.rendering_enabled = true;
@@ -206,8 +206,37 @@ void TestTickFailsOnWindowRenderFailure() {
 
     REQUIRE(runtime.Configure(policy));
     REQUIRE(runtime.Start());
+    REQUIRE(runtime.Tick());
+    REQUIRE(runtime.LastError().find("Render") != std::string::npos);
+    REQUIRE(runtime.LastError().find("degraded") != std::string::npos);
+
+    REQUIRE(runtime.Tick());
+    REQUIRE(runtime.LastError().find("degraded") != std::string::npos);
+
     REQUIRE(!runtime.Tick());
     REQUIRE(runtime.LastError().find("Render") != std::string::npos);
+    REQUIRE(runtime.LastError().find("escalating to fail-fast") != std::string::npos);
+    REQUIRE(runtime.LastError().find("failed") != std::string::npos);
+    REQUIRE(runtime.Stop());
+}
+
+void TestDeterministicHostRenderFailureFailsFastImmediately() {
+    framekit::runtime::LoopPolicy policy;
+    policy.profile = framekit::runtime::LoopProfile::kDeterministicHost;
+    policy.rendering_enabled = true;
+
+    auto platform = std::make_shared<FakePlatformHost>();
+    auto window = std::make_shared<FakeWindowHost>();
+    window->render_result = false;
+
+    framekit::runtime::PlatformHostRuntime runtime;
+    runtime.SetPlatformHost(platform);
+    runtime.SetWindowHost(window);
+
+    REQUIRE(runtime.Configure(policy));
+    REQUIRE(runtime.Start());
+    REQUIRE(!runtime.Tick());
+    REQUIRE(runtime.LastError().find("deterministic host profile") != std::string::npos);
     REQUIRE(runtime.Stop());
 }
 
@@ -219,6 +248,7 @@ int main() {
     TestStartFailsWithoutPlatformHost();
     TestStartFailsWhenRenderStagesActiveWithoutWindowHost();
     TestTickFailsOnPlatformPumpFailure();
-    TestTickFailsOnWindowRenderFailure();
+    TestTickRenderFailureDegradesThenEscalates();
+    TestDeterministicHostRenderFailureFailsFastImmediately();
     return 0;
 }

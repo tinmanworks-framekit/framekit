@@ -32,15 +32,35 @@ bool PlatformHostRuntime::Configure(const LoopPolicy& policy, WindowSpec primary
     policy_ = policy;
     primary_window_ = std::move(primary_window);
 
+    if (!fault_policy_.Configure(policy_)) {
+        last_error_ = fault_policy_.LastDecisionReason();
+        configured_ = false;
+        return false;
+    }
+
+    fault_policy_.Reset();
+
     loop_runner_.ClearStageHandlers();
     loop_runner_.SetStageHandler(LoopStage::kProcessPlatformEvents, [this]() {
         if (!platform_host_) {
-            SetErrorForStage(LoopStage::kProcessPlatformEvents, "platform host is not set");
+            HandleStageFault(
+                LoopStage::kProcessPlatformEvents,
+                FaultPolicyContext{
+                    .fault_class = FaultClass::kEvent,
+                    .contract_violation = true,
+                },
+                "platform host is not set");
             return;
         }
 
         if (!platform_host_->PumpEvents()) {
-            SetErrorForStage(LoopStage::kProcessPlatformEvents, "platform host failed to pump events");
+            HandleStageFault(
+                LoopStage::kProcessPlatformEvents,
+                FaultPolicyContext{
+                    .fault_class = FaultClass::kEvent,
+                    .contract_violation = true,
+                },
+                "platform host failed to pump events");
         }
     });
 
@@ -52,10 +72,23 @@ bool PlatformHostRuntime::Configure(const LoopPolicy& policy, WindowSpec primary
         if (!input_runtime_->NormalizePending()) {
             const auto& error = input_runtime_->LastError();
             if (error.empty()) {
-                SetErrorForStage(LoopStage::kNormalizeInput, "input normalization failed");
+                HandleStageFault(
+                    LoopStage::kNormalizeInput,
+                    FaultPolicyContext{
+                        .fault_class = FaultClass::kEvent,
+                        .contract_violation = true,
+                    },
+                    "input normalization failed");
                 return;
             }
-            SetErrorForStage(LoopStage::kNormalizeInput, error);
+
+            HandleStageFault(
+                LoopStage::kNormalizeInput,
+                FaultPolicyContext{
+                    .fault_class = FaultClass::kEvent,
+                    .contract_violation = true,
+                },
+                error);
         }
     });
 
@@ -69,34 +102,67 @@ bool PlatformHostRuntime::Configure(const LoopPolicy& policy, WindowSpec primary
 
     loop_runner_.SetStageHandler(LoopStage::kPreRender, [this]() {
         if (!window_host_) {
-            SetErrorForStage(LoopStage::kPreRender, "window host is not set");
+            HandleStageFault(
+                LoopStage::kPreRender,
+                FaultPolicyContext{
+                    .fault_class = FaultClass::kRender,
+                    .contract_violation = true,
+                },
+                "window host is not set");
             return;
         }
 
         if (!window_host_->PreRender()) {
-            SetErrorForStage(LoopStage::kPreRender, "window host pre-render failed");
+            HandleStageFault(
+                LoopStage::kPreRender,
+                FaultPolicyContext{
+                    .fault_class = FaultClass::kRender,
+                },
+                "window host pre-render failed");
         }
     });
 
     loop_runner_.SetStageHandler(LoopStage::kRender, [this]() {
         if (!window_host_) {
-            SetErrorForStage(LoopStage::kRender, "window host is not set");
+            HandleStageFault(
+                LoopStage::kRender,
+                FaultPolicyContext{
+                    .fault_class = FaultClass::kRender,
+                    .contract_violation = true,
+                },
+                "window host is not set");
             return;
         }
 
         if (!window_host_->Render()) {
-            SetErrorForStage(LoopStage::kRender, "window host render failed");
+            HandleStageFault(
+                LoopStage::kRender,
+                FaultPolicyContext{
+                    .fault_class = FaultClass::kRender,
+                },
+                "window host render failed");
         }
     });
 
     loop_runner_.SetStageHandler(LoopStage::kPostRender, [this]() {
         if (!window_host_) {
-            SetErrorForStage(LoopStage::kPostRender, "window host is not set");
+            HandleStageFault(
+                LoopStage::kPostRender,
+                FaultPolicyContext{
+                    .fault_class = FaultClass::kRender,
+                    .contract_violation = true,
+                },
+                "window host is not set");
             return;
         }
 
         if (!window_host_->PostRender()) {
-            SetErrorForStage(LoopStage::kPostRender, "window host post-render failed");
+            HandleStageFault(
+                LoopStage::kPostRender,
+                FaultPolicyContext{
+                    .fault_class = FaultClass::kRender,
+                },
+                "window host post-render failed");
         }
     });
 
@@ -218,7 +284,26 @@ bool PlatformHostRuntime::HasActiveRenderStages() const {
         std::find(active_stages.begin(), active_stages.end(), LoopStage::kPostRender) != active_stages.end();
 }
 
-void PlatformHostRuntime::SetErrorForStage(LoopStage stage, const std::string& message) {
+void PlatformHostRuntime::HandleStageFault(
+    LoopStage stage,
+    FaultPolicyContext context,
+    const std::string& message) {
+    const auto decision = fault_policy_.Evaluate(context);
+
+    if (decision.disposition == FaultDisposition::kDegrade) {
+        if (!last_error_.empty()) {
+            return;
+        }
+
+        last_error_ = "loop stage ";
+        last_error_ += LoopStageName(stage);
+        last_error_ += " degraded: ";
+        last_error_ += decision.reason;
+        last_error_ += "; detail: ";
+        last_error_ += message;
+        return;
+    }
+
     frame_failed_ = true;
     if (!last_error_.empty()) {
         return;
@@ -228,6 +313,8 @@ void PlatformHostRuntime::SetErrorForStage(LoopStage stage, const std::string& m
     last_error_ += LoopStageName(stage);
     last_error_ += " failed: ";
     last_error_ += message;
+    last_error_ += "; policy: ";
+    last_error_ += decision.reason;
 }
 
 } // namespace framekit::runtime
