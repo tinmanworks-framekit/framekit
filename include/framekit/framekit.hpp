@@ -7,6 +7,7 @@
 #include "framekit/process_topology.hpp"
 #include "framekit/runtime/multiprocess_runtime.hpp"
 #include "framekit/runtime/kernel_runtime.hpp"
+#include "framekit/runtime/fault_policy_runtime.hpp"
 #include "framekit/runtime/lifecycle_state.hpp"
 #include "framekit/runtime/lifecycle_state_machine.hpp"
 #include "framekit/runtime/input_routing_runtime.hpp"

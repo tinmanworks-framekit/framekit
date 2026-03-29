@@ -32,3 +32,10 @@ add_executable(framekit_input_routing_runtime_test
 
 target_link_libraries(framekit_input_routing_runtime_test PRIVATE FrameKit::Core)
 add_test(NAME framekit_input_routing_runtime_test COMMAND framekit_input_routing_runtime_test)
+
+add_executable(framekit_fault_policy_runtime_test
+    test_fault_policy_runtime.cpp
+)
+
+target_link_libraries(framekit_fault_policy_runtime_test PRIVATE FrameKit::Core)
+add_test(NAME framekit_fault_policy_runtime_test COMMAND framekit_fault_policy_runtime_test)
