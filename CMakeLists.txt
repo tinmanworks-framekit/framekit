@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.23)
 
-project(framekit VERSION 0.1.0 LANGUAGES C CXX)
+project(framekit VERSION 2.0.0 LANGUAGES C CXX)
 
 option(FRAMEKIT_BUILD_TESTS "Build framekit tests" ON)
 option(FRAMEKIT_BUILD_EXAMPLES "Build framekit examples" ON)
