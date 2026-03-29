@@ -1,7 +1,7 @@
 #pragma once
 
-#include "framekit/ipc/control_channel.hpp"
-#include "framekit/ipc/data_plane.hpp"
+#include "framekit/ipc/control.hpp"
+#include "framekit/ipc/data.hpp"
 
 #include <memory>
 #include <string>

@@ -1,9 +1,9 @@
 #pragma once
 
-#include "framekit/runtime/fault_policy_runtime.hpp"
-#include "framekit/runtime/input_routing_runtime.hpp"
-#include "framekit/runtime/loop_policy.hpp"
-#include "framekit/runtime/loop_stage_graph.hpp"
+#include "framekit/fault/policy_runtime.hpp"
+#include "framekit/input/routing.hpp"
+#include "framekit/loop/policy.hpp"
+#include "framekit/loop/stage_graph.hpp"
 
 #include <cstdint>
 #include <memory>

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "framekit/process_spec.hpp"
+#include "framekit/spec/process_spec.hpp"
 
 #include <string>
 #include <unordered_map>

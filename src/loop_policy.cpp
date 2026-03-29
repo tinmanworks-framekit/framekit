@@ -1,4 +1,4 @@
-#include "framekit/runtime/loop_policy.hpp"
+#include "framekit/loop/policy.hpp"
 
 #include <algorithm>
 #include <array>
