@@ -1,5 +1,8 @@
 # API/Docs Contract Alignment Audit (2026-03-29)
 
+Status: Stable
+Last Reviewed: 2026-03-29
+
 ## Audit Scope
 This audit was performed as part of Phase 3 Stabilization prior to release generation.
 It reviews alignment between the implemented contracts located across `include/framekit/*` and the public architecture/overview documentation.
