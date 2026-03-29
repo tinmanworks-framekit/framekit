@@ -1,5 +1,6 @@
 #pragma once
 
+#include "framekit/runtime/fault_policy_runtime.hpp"
 #include "framekit/runtime/input_routing_runtime.hpp"
 #include "framekit/runtime/loop_policy.hpp"
 #include "framekit/runtime/loop_stage_graph.hpp"
@@ -58,7 +59,10 @@ public:
 
 private:
     bool HasActiveRenderStages() const;
-    void SetErrorForStage(LoopStage stage, const std::string& message);
+    void HandleStageFault(
+        LoopStage stage,
+        FaultPolicyContext context,
+        const std::string& message);
 
     LoopStageGraphRunner loop_runner_;
     LoopPolicy policy_;
@@ -66,6 +70,7 @@ private:
     std::shared_ptr<IPlatformHost> platform_host_;
     std::shared_ptr<IWindowHost> window_host_;
     std::shared_ptr<InputRoutingRuntime> input_runtime_;
+    FaultPolicyRuntime fault_policy_;
     bool configured_ = false;
     bool running_ = false;
     bool window_created_ = false;
