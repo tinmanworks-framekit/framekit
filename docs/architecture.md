@@ -2,7 +2,7 @@
 
 ## Layers
 1. Contracts layer (`include/framekit/*`)
-2. Runtime layer (`runtime/multiprocess_runtime`)
+2. Runtime layer (`src/*.cpp` runtime components such as `multiprocess_runtime.cpp`, `loop_stage_graph.cpp`, and `kernel_runtime.cpp`)
 3. Integration layer (examples + future adapters)
 
 ## Ownership
@@ -20,6 +20,7 @@
 - [Service Context Contract and Freeze Policy](service-context-contract-freeze.md)
 - [Event and Input Semantics Contract](event-input-semantics.md)
 - [Error Policy Matrix by Loop Profile](error-policy-matrix.md)
+- [API/Docs Contract Alignment Audit (2026-03-29)](doctrine/api-doc-contract-alignment-2026-03-29.md)
 
 ## Architecture Decisions
 - [ADR Index](adr/README.md)
