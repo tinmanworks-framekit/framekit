@@ -24,7 +24,8 @@ Service context phases:
 
 - Open maps to Bootstrapping and Initializing.
 - Frozen maps to Running and early Stopping.
-- Teardown maps to service teardown during Stopping through Stopped.
+- Teardown maps to service teardown during Stopping and completes before
+  entering Stopped.
 - Registration is prohibited after the first freeze transition for the
   remainder of the host start cycle.
 

@@ -16,7 +16,7 @@ Each module exposes the following contract metadata:
 - Stable module identifier.
 - Declared dependency list (required and optional).
 - Lifecycle entry points for `initialize`, `start`, `stop`, and `teardown`
-  callbacks.
+  callbacks (`teardown` may be a no-op, but callback presence is required).
 - Capability metadata for diagnostics and startup reporting.
 
 Dynamic module loading/discovery is out of scope for this contract.
@@ -44,8 +44,8 @@ Module lifecycle states:
   Faulted and aborts further startup.
 - Active modules transition to Stopping when host shutdown begins and the
   module `stop` callback is invoked.
-- Stopping modules transition to Stopped only after completion of `stop` and,
-  when implemented, `teardown` callbacks.
+- Stopping modules transition to Stopped only after completion of `stop`,
+  followed by completion of the module `teardown` callback.
 - Faulted modules must not transition to Active without full host restart.
 
 ## Dependency DAG Semantics
