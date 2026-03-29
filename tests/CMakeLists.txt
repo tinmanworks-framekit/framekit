@@ -18,3 +18,10 @@ add_executable(framekit_loop_stage_graph_test
 
 target_link_libraries(framekit_loop_stage_graph_test PRIVATE FrameKit::Core)
 add_test(NAME framekit_loop_stage_graph_test COMMAND framekit_loop_stage_graph_test)
+
+add_executable(framekit_platform_host_runtime_test
+    test_platform_host_runtime.cpp
+)
+
+target_link_libraries(framekit_platform_host_runtime_test PRIVATE FrameKit::Core)
+add_test(NAME framekit_platform_host_runtime_test COMMAND framekit_platform_host_runtime_test)
