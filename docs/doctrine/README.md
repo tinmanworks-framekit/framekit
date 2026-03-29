@@ -11,6 +11,7 @@ The canonical source remains the Doctrine repository.
 - [Repository Management](repo-management.md)
 - [Release Workflow Playbook](release-playbook.md)
 - [Doctrine Governance](doctrine-governance.md)
+- [Project Board Workflow](project-board-workflow.md)
 
 ## Refresh
 

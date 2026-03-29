@@ -1,0 +1,71 @@
+name: Feature
+description: Propose and plan a new capability.
+title: "Feature: "
+labels:
+  - type/feature
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for new behavior or capability work.
+
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      description: One-sentence outcome statement.
+      placeholder: Add configurable loop profile selection at bootstrap.
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: What this issue includes.
+      placeholder: |
+        - Add profile selection contract
+        - Add validation rules
+    validations:
+      required: true
+
+  - type: textarea
+    id: non_scope
+    attributes:
+      label: Non-scope
+      description: What this issue explicitly does not include.
+      placeholder: |
+        - No runtime scheduler implementation changes
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: Use checklist items only.
+      placeholder: |
+        - [ ] Contract is documented
+        - [ ] Tests or validation evidence is linked
+    validations:
+      required: true
+
+  - type: dropdown
+    id: repo_owner
+    attributes:
+      label: Repository Owner
+      description: Select the primary repository for implementation.
+      options:
+        - framekit
+        - netkit
+        - mediakit
+        - cross-repo
+    validations:
+      required: true
+
+  - type: input
+    id: project_link
+    attributes:
+      label: Project Board Item Link
+      description: Link to the project board item if already created.
+      placeholder: https://github.com/orgs/tinmanworks-framekit/projects/2

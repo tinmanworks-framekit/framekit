@@ -7,3 +7,5 @@ Current baseline includes:
 - transport-selection contracts
 - multiprocess runtime skeleton
 - selective-linking guidance for optional module usage
+
+For v2 scope and boundaries, see the [FrameKit v2 Charter](charter-v2.md).

@@ -1,0 +1,69 @@
+name: Architecture Decision
+description: Propose or update a formal architecture decision record.
+title: "ADR: "
+labels:
+  - type/docs
+body:
+  - type: input
+    id: summary
+    attributes:
+      label: Decision Summary
+      description: One-line decision statement.
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: Which architecture boundary this decision affects.
+    validations:
+      required: true
+
+  - type: textarea
+    id: non_scope
+    attributes:
+      label: Non-scope
+      description: What this decision intentionally does not cover.
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Constraints and background.
+    validations:
+      required: true
+
+  - type: textarea
+    id: options
+    attributes:
+      label: Options Considered
+      description: Include tradeoffs.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: Use checklist items only.
+      placeholder: |
+        - [ ] Decision outcome is explicit
+        - [ ] Risks and migration notes are captured
+        - [ ] ADR document link is added
+    validations:
+      required: true
+
+  - type: dropdown
+    id: repo_owner
+    attributes:
+      label: Repository Owner
+      options:
+        - framekit
+        - netkit
+        - mediakit
+        - cross-repo
+    validations:
+      required: true
