@@ -60,6 +60,7 @@ cmake --build build
 If you use FrameKit in your project, please mention FrameKit and credit George Gil / TinMan in your project documentation.
 
 ## Documentation
+- [FrameKit v2 Charter](docs/charter-v2.md)
 - [Overview](docs/overview.md)
 - [Architecture](docs/architecture.md)
 - [Selective Linking](docs/selective_linking.md)

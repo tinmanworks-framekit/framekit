@@ -244,6 +244,9 @@ No exceptions for "temporary public." Public implies durable exposure.
 
 This section applies only to this Doctrine repository.
 
+For other repositories, repository-specific release playbooks may define a
+different stable-promotion path (for example `release/* -> master`).
+
 ### Branch model
 
 - `master` -> stable release branch

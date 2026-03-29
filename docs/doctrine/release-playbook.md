@@ -1,11 +1,22 @@
 # Release Workflow Playbook
 
 Status: Stable  
-Last Reviewed: 2026-03-04
+Last Reviewed: 2026-03-29
 
 ## Purpose
 
 Operational runbook for PR-only branch governance under Doctrine v0.2.0.
+
+This playbook is repository-specific for FrameKit and governs release
+promotion behavior for this repository.
+
+## Alignment Note
+
+- This repository enforces `release/* -> master` promotion.
+- The `develop -> master` model documented in
+   [Repository Management](repo-management.md) applies to the Doctrine
+   repository workflow section only and is not the release path for this
+   repository.
 
 ## Branch Strategy
 
@@ -28,6 +39,9 @@ Workflow names backing these checks:
 - `CI (PR Title)` -> `pr-title`
 - `CI (Issue Link)` -> `issue-link`
 - `CI (Master Promotion)` -> `master-promotion`
+
+The `master-promotion` status context is emitted by job `master-promotion` in
+workflow file `.github/workflows/ci-master-promotion.yml`.
 
 ## Pre-Flight Checklist
 
@@ -77,12 +91,26 @@ Cause: Workflow not active, check name drift, or queued jobs.
 Recovery:
 
 1. Confirm workflow files exist in `.github/workflows/` and are active in GitHub Actions.
-2. Confirm branch protection required check names exactly match:
+2. Confirm `.github/workflows/ci-master-promotion.yml` contains job name `master-promotion`.
+3. Confirm branch protection required check names exactly match:
    - `smoke`
    - `pr-title`
    - `issue-link`
    - `master-promotion` (for `master`)
-3. Re-run workflows or update branch protection check list to match canonical names.
+4. Re-run workflows or update branch protection check list to match canonical names.
+
+## Branch Protection Consistency Validation
+
+Validated policy for this repository:
+
+- `develop` required checks: `smoke`, `pr-title`, `issue-link`
+- `master` required checks: `smoke`, `pr-title`, `issue-link`,
+  `master-promotion`
+
+Validation should be re-run whenever branch protection or workflow names
+change.
+
+Last validation run: 2026-03-29 via GitHub API branch protection queries.
 
 ## Emergency Hotfix
 

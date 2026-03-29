@@ -5,9 +5,37 @@ add_executable(framekit_contracts_test
 target_link_libraries(framekit_contracts_test PRIVATE FrameKit::Core)
 add_test(NAME framekit_contracts_test COMMAND framekit_contracts_test)
 
-add_executable(framekit_window_backend_test
-    test_window_backend.cpp
+add_executable(framekit_runtime_contract_primitives_test
+    test_runtime_contract_primitives.cpp
 )
 
-target_link_libraries(framekit_window_backend_test PRIVATE FrameKit::Core)
-add_test(NAME framekit_window_backend_test COMMAND framekit_window_backend_test)
+target_link_libraries(framekit_runtime_contract_primitives_test PRIVATE FrameKit::Core)
+add_test(NAME framekit_runtime_contract_primitives_test COMMAND framekit_runtime_contract_primitives_test)
+
+add_executable(framekit_loop_stage_graph_test
+    test_loop_stage_graph.cpp
+)
+
+target_link_libraries(framekit_loop_stage_graph_test PRIVATE FrameKit::Core)
+add_test(NAME framekit_loop_stage_graph_test COMMAND framekit_loop_stage_graph_test)
+
+add_executable(framekit_platform_host_runtime_test
+    test_platform_host_runtime.cpp
+)
+
+target_link_libraries(framekit_platform_host_runtime_test PRIVATE FrameKit::Core)
+add_test(NAME framekit_platform_host_runtime_test COMMAND framekit_platform_host_runtime_test)
+
+add_executable(framekit_input_routing_runtime_test
+    test_input_routing_runtime.cpp
+)
+
+target_link_libraries(framekit_input_routing_runtime_test PRIVATE FrameKit::Core)
+add_test(NAME framekit_input_routing_runtime_test COMMAND framekit_input_routing_runtime_test)
+
+add_executable(framekit_fault_policy_runtime_test
+    test_fault_policy_runtime.cpp
+)
+
+target_link_libraries(framekit_fault_policy_runtime_test PRIVATE FrameKit::Core)
+add_test(NAME framekit_fault_policy_runtime_test COMMAND framekit_fault_policy_runtime_test)

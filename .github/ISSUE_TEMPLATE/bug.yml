@@ -1,0 +1,78 @@
+name: Bug
+description: Report a defect with clear reproduction and acceptance fix criteria.
+title: "Bug: "
+labels:
+  - type/fix
+body:
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      description: One-line defect statement.
+      placeholder: Loop profile parser rejects valid headless profile value.
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: Which behavior and components are affected.
+      placeholder: |
+        - Profile parsing path in bootstrap
+        - Validation error reporting
+    validations:
+      required: true
+
+  - type: textarea
+    id: non_scope
+    attributes:
+      label: Non-scope
+      description: What must remain unchanged.
+      placeholder: |
+        - No changes to runtime loop stage ordering
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction
+      description: Repro steps and observed result.
+      placeholder: |
+        1. Configure profile=headless
+        2. Start app
+        3. Observe parsing failure
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Result
+      description: Correct behavior after fix.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: Use checklist items only.
+      placeholder: |
+        - [ ] Repro no longer fails
+        - [ ] Regression test or validation evidence is linked
+    validations:
+      required: true
+
+  - type: dropdown
+    id: repo_owner
+    attributes:
+      label: Repository Owner
+      options:
+        - framekit
+        - netkit
+        - mediakit
+        - cross-repo
+    validations:
+      required: true
