@@ -208,6 +208,8 @@ bool PlatformHostRuntime::Start() {
     }
 
     running_ = true;
+    has_last_tick_timestamp_ = true;
+    last_tick_timestamp_ = std::chrono::steady_clock::now();
     last_error_.clear();
     return true;
 }
@@ -221,7 +223,18 @@ bool PlatformHostRuntime::Tick() {
     frame_failed_ = false;
     last_error_.clear();
 
-    if (!loop_runner_.ExecuteFrame()) {
+    const auto now = std::chrono::steady_clock::now();
+    std::uint64_t elapsed_ns = 0;
+    if (has_last_tick_timestamp_) {
+        const auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(
+            now - last_tick_timestamp_);
+        elapsed_ns = static_cast<std::uint64_t>(elapsed.count());
+    } else {
+        has_last_tick_timestamp_ = true;
+    }
+    last_tick_timestamp_ = now;
+
+    if (!loop_runner_.ExecuteFrame(elapsed_ns)) {
         last_error_ = loop_runner_.LastError();
         return false;
     }
@@ -254,6 +267,7 @@ bool PlatformHostRuntime::Stop() {
     running_ = false;
     window_created_ = false;
     frame_failed_ = false;
+    has_last_tick_timestamp_ = false;
     return ok;
 }
 

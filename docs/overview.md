@@ -9,7 +9,7 @@ Current baseline includes:
 - lifecycle state machine and kernel runtime start/stop orchestration
 - loop profile and execution-policy validation contracts
 - profile-aware fault-policy runtime with bounded degrade budgets and fail-fast escalation integrated into platform stage-failure handling
-- loop stage graph runner with deterministic baseline-stage execution order
+- loop stage graph runner with deterministic baseline-stage execution order and fixed-delta overrun semantics (slip, bounded catch-up, drop-noncritical, fail-fast)
 - platform/window host baseline runtime integrated with stage-driven event pump and render hooks
 - input normalization and window-aware immediate routing runtime integrated with loop stages
 - service context freeze/lookup semantics and teardown ordering

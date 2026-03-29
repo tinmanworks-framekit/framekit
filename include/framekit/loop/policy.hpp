@@ -37,6 +37,7 @@ struct LoopPolicy {
     TimingMode timing_mode = TimingMode::kVariableDelta;
     OverrunMode overrun_mode = OverrunMode::kSlip;
     ThreadingMode threading_mode = ThreadingMode::kSingleThreaded;
+    std::uint64_t fixed_delta_ns = 16666667;
     std::uint32_t max_catch_up_steps = 0;
     bool rendering_enabled = true;
     std::vector<std::string> disabled_optional_stages;

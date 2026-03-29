@@ -38,12 +38,15 @@ public:
     void SetStageHandler(LoopStage stage, StageHandler handler);
     void ClearStageHandlers();
 
-    bool ExecuteFrame();
+    bool ExecuteFrame(std::uint64_t elapsed_ns = 0);
 
     bool IsConfigured() const;
     const LoopPolicy& Policy() const;
     const std::vector<LoopStage>& ActiveStages() const;
     const std::vector<LoopStage>& LastExecutedStages() const;
+    std::uint32_t LastUpdateStepCount() const;
+    std::uint32_t LastDroppedUpdateStepCount() const;
+    bool LastFrameDroppedNonCriticalStages() const;
     const std::string& LastError() const;
 
 private:
@@ -57,6 +60,10 @@ private:
     std::unordered_map<LoopStage, StageHandler, LoopStageHash> handlers_;
     std::vector<LoopStage> active_stages_;
     std::vector<LoopStage> last_executed_stages_;
+    std::uint32_t last_update_step_count_ = 1;
+    std::uint32_t last_dropped_update_step_count_ = 0;
+    bool last_frame_dropped_non_critical_stages_ = false;
+    std::uint64_t fixed_delta_accumulator_ns_ = 0;
     std::string last_error_;
     bool configured_ = false;
 };
