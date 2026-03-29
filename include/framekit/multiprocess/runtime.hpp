@@ -7,6 +7,7 @@
 #include "framekit/multiprocess/launcher.hpp"
 #include "framekit/multiprocess/supervisor.hpp"
 
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
@@ -43,9 +44,12 @@ public:
 
     void RecordHeartbeat(std::uint64_t process_id, std::uint64_t sequence_id);
     std::uint64_t HeartbeatCount(std::uint64_t process_id) const;
+    std::uint32_t RestartAttemptCount(const std::string& process_name) const;
 
 private:
     bool LaunchChildren();
+    const framekit::ProcessSpec* FindProcessSpec(const framekit::ProcessIdentity& identity) const;
+    bool ConsumeRestartBudget(const framekit::ProcessIdentity& identity);
     bool RelaunchChild(const framekit::ProcessIdentity& old_identity);
 
     framekit::ApplicationSpec spec_;
@@ -56,6 +60,7 @@ private:
     std::vector<framekit::ProcessIdentity> child_processes_;
     std::unordered_map<std::uint64_t, ChildHandshakeStatus> child_handshakes_;
     std::unordered_map<std::uint64_t, std::uint64_t> heartbeat_counters_;
+    std::unordered_map<std::string, std::uint32_t> restart_attempt_counters_;
     bool running_ = false;
 };
 

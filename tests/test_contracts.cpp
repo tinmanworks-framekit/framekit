@@ -58,7 +58,8 @@ public:
     bool ShouldRestart(const framekit::ProcessIdentity& identity, int exit_code) override {
         (void)identity;
         (void)exit_code;
-        return false;
+        should_restart_calls += 1;
+        return restart_on_missed;
     }
 
     void OnHeartbeatMissed(const framekit::ProcessIdentity& identity) override {
@@ -69,6 +70,8 @@ public:
         stopped_ids.push_back(identity.process_id);
     }
 
+    int should_restart_calls = 0;
+    bool restart_on_missed = false;
     std::vector<std::uint64_t> missed_heartbeat_ids;
     std::vector<std::uint64_t> stopped_ids;
 };
@@ -145,6 +148,8 @@ int main() {
     backend_spec.name = "backend";
     backend_spec.role = framekit::ProcessRole::kBackend;
     backend_spec.executable_path = "bin/backend_app";
+    backend_spec.auto_restart = true;
+    backend_spec.max_restart_attempts = 2;
     multiprocess_spec.process_topology.nodes.push_back(backend_spec);
 
     auto launcher = std::make_shared<FakeProcessLauncher>();
@@ -181,6 +186,9 @@ int main() {
     runtime.Tick();
     REQUIRE(supervisor->missed_heartbeat_ids.size() == 1);
     REQUIRE(supervisor->missed_heartbeat_ids.front() == child.process_id);
+    REQUIRE(supervisor->should_restart_calls == 1);
+    REQUIRE(runtime.ChildProcesses().size() == 1);
+    REQUIRE(runtime.ChildProcesses().front().process_id == child.process_id);
 
     runtime.RecordHeartbeat(child.process_id, 1);
     REQUIRE(runtime.HeartbeatCount(child.process_id) == 1);
@@ -191,6 +199,7 @@ int main() {
     REQUIRE(supervisor->missed_heartbeat_ids.size() == 1);
 
     REQUIRE(runtime.RestartChild(child.process_id));
+    REQUIRE(runtime.RestartAttemptCount("backend") == 1);
     REQUIRE(lifecycle->restart_requested_ids.size() == 1);
     REQUIRE(lifecycle->restart_requested_ids.front() == child.process_id);
     REQUIRE(lifecycle->restart_from_ids.size() == 1);
@@ -207,6 +216,68 @@ int main() {
 
     runtime.Stop();
     REQUIRE(!runtime.IsRunning());
+
+    framekit::ApplicationSpec defaults_spec;
+    defaults_spec.mode = framekit::AppMode::kMultiProcess;
+
+    framekit::ProcessSpec defaults_backend_spec;
+    defaults_backend_spec.name = "backend-default";
+    defaults_backend_spec.role = framekit::ProcessRole::kBackend;
+    defaults_backend_spec.executable_path = "bin/backend_default_app";
+    defaults_backend_spec.auto_restart = true;
+    defaults_backend_spec.max_restart_attempts = 1;
+    defaults_spec.process_topology.nodes.push_back(defaults_backend_spec);
+
+    framekit::runtime::MultiprocessRuntime defaults_runtime;
+    auto defaults_launcher = std::make_shared<FakeProcessLauncher>();
+    defaults_runtime.Configure(defaults_spec);
+    defaults_runtime.SetProcessLauncher(defaults_launcher);
+
+    REQUIRE(defaults_runtime.Start());
+    REQUIRE(defaults_runtime.ChildProcesses().size() == 1);
+    const auto defaults_initial_pid = defaults_runtime.ChildProcesses().front().process_id;
+
+    defaults_runtime.Tick();
+    REQUIRE(defaults_runtime.ChildProcesses().size() == 1);
+    const auto defaults_restarted_pid = defaults_runtime.ChildProcesses().front().process_id;
+    REQUIRE(defaults_restarted_pid != defaults_initial_pid);
+    REQUIRE(defaults_runtime.RestartAttemptCount("backend-default") == 1);
+
+    defaults_runtime.Tick();
+    REQUIRE(defaults_runtime.ChildProcesses().size() == 1);
+    REQUIRE(defaults_runtime.ChildProcesses().front().process_id == defaults_restarted_pid);
+    REQUIRE(defaults_runtime.RestartAttemptCount("backend-default") == 1);
+
+    defaults_runtime.RecordHeartbeat(defaults_restarted_pid, 1);
+    defaults_runtime.Tick();
+    REQUIRE(defaults_runtime.ChildProcesses().front().process_id == defaults_restarted_pid);
+
+    defaults_runtime.Stop();
+    REQUIRE(!defaults_runtime.IsRunning());
+
+    framekit::ApplicationSpec disabled_restart_spec;
+    disabled_restart_spec.mode = framekit::AppMode::kMultiProcess;
+
+    framekit::ProcessSpec disabled_restart_backend_spec;
+    disabled_restart_backend_spec.name = "backend-no-restart";
+    disabled_restart_backend_spec.role = framekit::ProcessRole::kBackend;
+    disabled_restart_backend_spec.executable_path = "bin/backend_no_restart_app";
+    disabled_restart_backend_spec.auto_restart = false;
+    disabled_restart_backend_spec.max_restart_attempts = 3;
+    disabled_restart_spec.process_topology.nodes.push_back(disabled_restart_backend_spec);
+
+    framekit::runtime::MultiprocessRuntime disabled_restart_runtime;
+    auto disabled_restart_launcher = std::make_shared<FakeProcessLauncher>();
+    disabled_restart_runtime.Configure(disabled_restart_spec);
+    disabled_restart_runtime.SetProcessLauncher(disabled_restart_launcher);
+
+    REQUIRE(disabled_restart_runtime.Start());
+    REQUIRE(disabled_restart_runtime.ChildProcesses().size() == 1);
+    const auto no_restart_pid = disabled_restart_runtime.ChildProcesses().front().process_id;
+    REQUIRE(!disabled_restart_runtime.RestartChild(no_restart_pid));
+    REQUIRE(disabled_restart_runtime.RestartAttemptCount("backend-no-restart") == 0);
+    disabled_restart_runtime.Stop();
+    REQUIRE(!disabled_restart_runtime.IsRunning());
 
     return 0;
 }
