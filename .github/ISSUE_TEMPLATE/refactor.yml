@@ -1,0 +1,61 @@
+name: Refactor
+description: Internal restructuring without intended behavior change.
+title: "Refactor: "
+labels:
+  - type/refactor
+body:
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      description: One-line refactor objective.
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: Code or architecture areas included.
+    validations:
+      required: true
+
+  - type: textarea
+    id: non_scope
+    attributes:
+      label: Non-scope
+      description: Components and behaviors that must not change.
+    validations:
+      required: true
+
+  - type: textarea
+    id: risk
+    attributes:
+      label: Risk Notes
+      description: Known refactor risks and rollback expectations.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: Use checklist items only.
+      placeholder: |
+        - [ ] Public behavior is unchanged
+        - [ ] Existing tests pass
+        - [ ] New validation evidence is linked
+    validations:
+      required: true
+
+  - type: dropdown
+    id: repo_owner
+    attributes:
+      label: Repository Owner
+      options:
+        - framekit
+        - netkit
+        - mediakit
+        - cross-repo
+    validations:
+      required: true

@@ -1,0 +1,68 @@
+name: Experiment
+description: Structured experiment with hypothesis, signal, and outcome.
+title: "Experiment: "
+labels:
+  - type/chore
+body:
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      description: One-line experiment objective.
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: What will be evaluated.
+    validations:
+      required: true
+
+  - type: textarea
+    id: non_scope
+    attributes:
+      label: Non-scope
+      description: What this experiment will not change.
+    validations:
+      required: true
+
+  - type: textarea
+    id: hypothesis
+    attributes:
+      label: Hypothesis
+      description: What you expect to be true.
+    validations:
+      required: true
+
+  - type: textarea
+    id: signal
+    attributes:
+      label: Expected Signal
+      description: Measurable indicators for pass or fail.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: Use checklist items only.
+      placeholder: |
+        - [ ] Experiment result is documented
+        - [ ] Follow-up decision issue is linked
+    validations:
+      required: true
+
+  - type: dropdown
+    id: repo_owner
+    attributes:
+      label: Repository Owner
+      options:
+        - framekit
+        - netkit
+        - mediakit
+        - cross-repo
+    validations:
+      required: true
