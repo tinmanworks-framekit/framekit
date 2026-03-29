@@ -42,6 +42,11 @@ public:
 
     bool StopChild(const framekit::ProcessIdentity& identity) override {
         stop_calls += 1;
+
+        if (!fail_stop_role_name.empty() && fail_stop_role_name == identity.role_name) {
+            return false;
+        }
+
         for (auto it = running_.begin(); it != running_.end(); ++it) {
             if (it->process_id == identity.process_id) {
                 running_.erase(it);
@@ -58,6 +63,7 @@ public:
     int launch_calls = 0;
     int stop_calls = 0;
     std::string fail_launch_role_name;
+    std::string fail_stop_role_name;
 
 private:
     std::uint64_t next_pid_ = 42;
@@ -402,11 +408,36 @@ int main() {
 
     REQUIRE(!partial_launch_failure_runtime.Start());
     REQUIRE(partial_launch_failure_runtime.LastError().find("failed to launch child process: launch-worker") != std::string::npos);
+    REQUIRE(partial_launch_failure_runtime.LastError().find("rollback stop failed") == std::string::npos);
     REQUIRE(partial_launch_failure_runtime.ChildProcesses().empty());
     REQUIRE(partial_launch_failure_runtime.AllChildHandshakes().empty());
     REQUIRE(partial_launch_failure_launcher->launch_calls == 2);
     REQUIRE(partial_launch_failure_launcher->stop_calls == 1);
     REQUIRE(partial_launch_failure_launcher->RunningChildren().empty());
+
+    framekit::runtime::MultiprocessRuntime rollback_stop_failure_runtime;
+    auto rollback_stop_failure_launcher = std::make_shared<FakeProcessLauncher>();
+    rollback_stop_failure_launcher->fail_launch_role_name = "launch-worker";
+    rollback_stop_failure_launcher->fail_stop_role_name = "launch-backend";
+    rollback_stop_failure_runtime.Configure(partial_launch_failure_spec);
+    rollback_stop_failure_runtime.SetProcessLauncher(rollback_stop_failure_launcher);
+
+    REQUIRE(!rollback_stop_failure_runtime.Start());
+    REQUIRE(rollback_stop_failure_runtime.LastError().find("failed to launch child process: launch-worker") != std::string::npos);
+    REQUIRE(rollback_stop_failure_runtime.LastError().find("rollback stop failed") != std::string::npos);
+    REQUIRE(rollback_stop_failure_runtime.ChildProcesses().size() == 1);
+    REQUIRE(rollback_stop_failure_runtime.ChildProcesses().front().role_name == "launch-backend");
+
+    const auto rollback_stop_failure_handshake = rollback_stop_failure_runtime.ChildHandshake(
+        rollback_stop_failure_runtime.ChildProcesses().front().process_id);
+    REQUIRE(rollback_stop_failure_handshake.has_value());
+    REQUIRE(rollback_stop_failure_handshake->detail == "rollback-stop-failed");
+    REQUIRE(rollback_stop_failure_launcher->RunningChildren().size() == 1);
+
+    rollback_stop_failure_launcher->fail_stop_role_name.clear();
+    rollback_stop_failure_runtime.Stop();
+    REQUIRE(rollback_stop_failure_runtime.ChildProcesses().empty());
+    REQUIRE(rollback_stop_failure_launcher->RunningChildren().empty());
 
     framekit::ApplicationSpec transport_spec;
     transport_spec.application_name = "framekit-transport-test";
