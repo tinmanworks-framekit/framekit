@@ -13,7 +13,7 @@ Current baseline includes:
 - platform/window host baseline runtime integrated with stage-driven event pump and render hooks
 - input normalization and window-aware immediate routing runtime integrated with loop stages
 - service context freeze/lookup semantics and teardown ordering
-- module dependency DAG validation with deterministic startup/shutdown ordering
+- module dependency DAG validation with deterministic initialize/start orchestration and reverse-order stop/teardown
 - event bus immediate/deferred dispatch baseline with consume and priority semantics
 - selective-linking guidance for optional module usage
 
