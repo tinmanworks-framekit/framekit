@@ -14,3 +14,4 @@
 - [FrameKit v2 Charter](charter-v2.md)
 - [External Integration Boundary Contract](integration-boundary.md)
 - [FrameKit v2 Stable Contract Inventory](v2-stable-contracts.md)
+- [Lifecycle and Shutdown Semantics](lifecycle-semantics.md)
