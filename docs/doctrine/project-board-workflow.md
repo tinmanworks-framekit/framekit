@@ -36,6 +36,7 @@ Policy mapping:
 Standard fields already present:
 
 - `Status`
+- `Type`
 - `Priority`
 - `Repository`
 - `Iteration`
@@ -45,6 +46,10 @@ Custom fields added for v2 planning:
 - `Depends On` (TEXT)
 - `Risk` (SINGLE_SELECT: Low, Medium, High, Critical)
 - `Architecture Area` (SINGLE_SELECT)
+
+Related required issue metadata:
+
+- `Milestone` (GitHub issue milestone; required on Phase 0 issues, not a project field)
 
 ## Automation Rules
 

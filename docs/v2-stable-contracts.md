@@ -5,7 +5,7 @@ Last Reviewed: 2026-03-29
 
 ## Purpose
 
-Define which FrameKit v2 contracts are frozen at v2.x and which areas remain
+Define which FrameKit v2 contracts are frozen for v2.x and which areas remain
 flexible for iterative implementation and adapter evolution.
 
 ## Stability Policy
