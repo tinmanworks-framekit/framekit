@@ -12,6 +12,10 @@ void PlatformHostRuntime::SetWindowHost(std::shared_ptr<IWindowHost> host) {
     window_host_ = std::move(host);
 }
 
+void PlatformHostRuntime::SetInputRuntime(std::shared_ptr<InputRoutingRuntime> input_runtime) {
+    input_runtime_ = std::move(input_runtime);
+}
+
 bool PlatformHostRuntime::Configure(const LoopPolicy& policy, WindowSpec primary_window) {
     if (running_) {
         last_error_ = "cannot configure platform runtime while running";
@@ -38,6 +42,29 @@ bool PlatformHostRuntime::Configure(const LoopPolicy& policy, WindowSpec primary
         if (!platform_host_->PumpEvents()) {
             SetErrorForStage(LoopStage::kProcessPlatformEvents, "platform host failed to pump events");
         }
+    });
+
+    loop_runner_.SetStageHandler(LoopStage::kNormalizeInput, [this]() {
+        if (!input_runtime_) {
+            return;
+        }
+
+        if (!input_runtime_->NormalizePending()) {
+            const auto& error = input_runtime_->LastError();
+            if (error.empty()) {
+                SetErrorForStage(LoopStage::kNormalizeInput, "input normalization failed");
+                return;
+            }
+            SetErrorForStage(LoopStage::kNormalizeInput, error);
+        }
+    });
+
+    loop_runner_.SetStageHandler(LoopStage::kDispatchImmediateEvents, [this]() {
+        if (!input_runtime_) {
+            return;
+        }
+
+        (void)input_runtime_->DispatchImmediate();
     });
 
     loop_runner_.SetStageHandler(LoopStage::kPreRender, [this]() {
@@ -191,7 +218,7 @@ bool PlatformHostRuntime::HasActiveRenderStages() const {
         std::find(active_stages.begin(), active_stages.end(), LoopStage::kPostRender) != active_stages.end();
 }
 
-void PlatformHostRuntime::SetErrorForStage(LoopStage stage, const char* message) {
+void PlatformHostRuntime::SetErrorForStage(LoopStage stage, const std::string& message) {
     frame_failed_ = true;
     if (!last_error_.empty()) {
         return;
