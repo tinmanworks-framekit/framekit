@@ -20,3 +20,10 @@
 - [Service Context Contract and Freeze Policy](service-context-contract-freeze.md)
 - [Event and Input Semantics Contract](event-input-semantics.md)
 - [Error Policy Matrix by Loop Profile](error-policy-matrix.md)
+
+## Architecture Decisions
+- [ADR Index](adr/README.md)
+- [ADR-0001: Service Context Model and Freeze Policy](adr/ADR-0001-service-context-model.md)
+- [ADR-0002: Module Loading Model (Static Baseline)](adr/ADR-0002-module-loading-model.md)
+- [ADR-0003: Loop Profiles and Policy Model](adr/ADR-0003-loop-profile-policy-model.md)
+- [ADR-0004: Error Policy Matrix and Escalation Rules](adr/ADR-0004-error-policy-model.md)
