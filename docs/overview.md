@@ -10,6 +10,7 @@ Current baseline includes:
 - loop profile and execution-policy validation contracts
 - loop stage graph runner with deterministic baseline-stage execution order
 - platform/window host baseline runtime integrated with stage-driven event pump and render hooks
+- input normalization and window-aware immediate routing runtime integrated with loop stages
 - service context freeze/lookup semantics and teardown ordering
 - module dependency DAG validation with deterministic startup/shutdown ordering
 - event bus immediate/deferred dispatch baseline with consume and priority semantics
