@@ -232,19 +232,38 @@ bool MultiprocessRuntime::LaunchChildren() {
     parent_identity.process_id = 1;
 
     const auto rollback_launch_state = [this]() {
-        bool rollback_succeeded = true;
+        std::vector<framekit::ProcessIdentity> rollback_failed_children;
 
         for (auto it = child_processes_.rbegin(); it != child_processes_.rend(); ++it) {
             if (!process_launcher_->StopChild(*it)) {
-                rollback_succeeded = false;
+                rollback_failed_children.push_back(*it);
             }
         }
 
-        child_processes_.clear();
         child_handshakes_.clear();
         heartbeat_counters_.clear();
         restart_attempt_counters_.clear();
-        return rollback_succeeded;
+
+        if (rollback_failed_children.empty()) {
+            child_processes_.clear();
+            return true;
+        }
+
+        std::reverse(rollback_failed_children.begin(), rollback_failed_children.end());
+        child_processes_ = std::move(rollback_failed_children);
+        for (const auto& child_identity : child_processes_) {
+            child_handshakes_[child_identity.process_id] = ChildHandshakeStatus{
+                .child = child_identity,
+                .state = ChildHandshakeState::kSpawned,
+                .detail = "rollback-stop-failed"};
+            heartbeat_counters_[child_identity.process_id] = 0;
+
+            if (const auto* process_spec = FindProcessSpec(child_identity)) {
+                restart_attempt_counters_[process_spec->name] = 0;
+            }
+        }
+
+        return false;
     };
 
     for (const auto& node : spec_.process_topology.nodes) {
