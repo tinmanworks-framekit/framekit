@@ -4,7 +4,7 @@ FrameKit is a modular framework for building C/C++ applications that may run as 
 
 Current baseline includes:
 - process role and topology contracts
-- transport-selection contracts
+- transport-selection contracts with multiprocess runtime transport-factory integration baseline
 - multiprocess runtime baseline with deterministic default liveness/supervisor behavior and ProcessSpec restart-budget enforcement
 - lifecycle state machine and kernel runtime start/stop orchestration
 - loop profile and execution-policy validation contracts

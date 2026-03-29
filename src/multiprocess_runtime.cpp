@@ -4,6 +4,21 @@
 
 namespace {
 
+const char* TransportKindName(framekit::IpcTransportKind kind) {
+    switch (kind) {
+        case framekit::IpcTransportKind::kNone:
+            return "none";
+        case framekit::IpcTransportKind::kShmPipe:
+            return "shm_pipe";
+        case framekit::IpcTransportKind::kLocalSocket:
+            return "local_socket";
+        case framekit::IpcTransportKind::kCustom:
+            return "custom";
+    }
+
+    return "unknown";
+}
+
 class DefaultSupervisorPolicy final : public framekit::runtime::ISupervisorPolicy {
 public:
     bool ShouldRestart(const framekit::ProcessIdentity& identity, int exit_code) override {
@@ -51,6 +66,10 @@ void MultiprocessRuntime::SetProcessLauncher(std::shared_ptr<IProcessLauncher> l
     process_launcher_ = std::move(launcher);
 }
 
+void MultiprocessRuntime::SetTransportFactory(std::shared_ptr<framekit::ipc::ITransportFactory> factory) {
+    transport_factory_ = std::move(factory);
+}
+
 void MultiprocessRuntime::SetLivenessPolicy(std::shared_ptr<ILivenessPolicy> policy) {
     liveness_policy_ = std::move(policy);
 }
@@ -61,8 +80,11 @@ void MultiprocessRuntime::SetLifecycleHooks(std::shared_ptr<ILifecycleHooks> hoo
 
 bool MultiprocessRuntime::Start() {
     if (running_) {
+        last_error_ = "multiprocess runtime is already running";
         return false;
     }
+
+    last_error_.clear();
 
     if (!supervisor_policy_) {
         supervisor_policy_ = std::make_shared<DefaultSupervisorPolicy>();
@@ -72,8 +94,22 @@ bool MultiprocessRuntime::Start() {
         liveness_policy_ = std::make_shared<DefaultLivenessPolicy>();
     }
 
-    if (spec_.mode == framekit::AppMode::kMultiProcess && !LaunchChildren()) {
-        return false;
+    if (spec_.mode == framekit::AppMode::kMultiProcess) {
+        if (spec_.transport_kind != framekit::IpcTransportKind::kNone && !ConfigureTransport()) {
+            return false;
+        }
+
+        if (!LaunchChildren()) {
+            if (transport_bundle_.control_channel) {
+                transport_bundle_.control_channel->Close();
+            }
+            transport_bundle_ = {};
+            active_transport_config_ = {};
+            if (last_error_.empty()) {
+                last_error_ = "failed to launch child processes";
+            }
+            return false;
+        }
     }
 
     running_ = true;
@@ -131,6 +167,48 @@ void MultiprocessRuntime::Stop() {
     child_handshakes_.clear();
     heartbeat_counters_.clear();
     restart_attempt_counters_.clear();
+
+    if (transport_bundle_.control_channel) {
+        transport_bundle_.control_channel->Close();
+    }
+    transport_bundle_ = {};
+    active_transport_config_ = {};
+    last_error_.clear();
+}
+
+bool MultiprocessRuntime::ConfigureTransport() {
+    if (!transport_factory_) {
+        last_error_ = "transport factory is required when transport_kind is not none";
+        return false;
+    }
+
+    framekit::ipc::TransportConfig config;
+    config.name = TransportKindName(spec_.transport_kind);
+    config.values["application"] = spec_.application_name;
+    config.values["profile"] = spec_.transport_profile;
+    config.values["kind"] = config.name;
+
+    auto bundle = transport_factory_->Create(config);
+    if (!bundle.control_channel) {
+        last_error_ = "transport factory returned null control channel";
+        return false;
+    }
+
+    if (!bundle.control_channel->IsOpen()) {
+        bundle.control_channel->Close();
+        last_error_ = "transport control channel is not open";
+        return false;
+    }
+
+    if (!bundle.data_plane) {
+        bundle.control_channel->Close();
+        last_error_ = "transport factory returned null data plane";
+        return false;
+    }
+
+    active_transport_config_ = std::move(config);
+    transport_bundle_ = std::move(bundle);
+    return true;
 }
 
 bool MultiprocessRuntime::LaunchChildren() {
@@ -140,7 +218,12 @@ bool MultiprocessRuntime::LaunchChildren() {
     restart_attempt_counters_.clear();
 
     if (!process_launcher_) {
-        return spec_.process_topology.nodes.empty();
+        if (!spec_.process_topology.nodes.empty()) {
+            last_error_ = "process launcher is required for non-empty process topology";
+            return false;
+        }
+
+        return true;
     }
 
     framekit::ProcessIdentity parent_identity;
@@ -155,6 +238,7 @@ bool MultiprocessRuntime::LaunchChildren() {
 
         auto launched = process_launcher_->LaunchChild(parent_identity, node);
         if (!launched.has_value() || !launched->running) {
+            last_error_ = "failed to launch child process: " + node.name;
             return false;
         }
 
@@ -238,6 +322,20 @@ std::uint32_t MultiprocessRuntime::RestartAttemptCount(const std::string& proces
     return it->second;
 }
 
+bool MultiprocessRuntime::HasActiveTransport() const {
+    return transport_bundle_.control_channel &&
+        transport_bundle_.data_plane &&
+        transport_bundle_.control_channel->IsOpen();
+}
+
+const framekit::ipc::TransportConfig& MultiprocessRuntime::ActiveTransportConfig() const {
+    return active_transport_config_;
+}
+
+const std::string& MultiprocessRuntime::LastError() const {
+    return last_error_;
+}
+
 const framekit::ProcessSpec* MultiprocessRuntime::FindProcessSpec(
     const framekit::ProcessIdentity& identity) const {
     for (const auto& spec : spec_.process_topology.nodes) {
@@ -251,12 +349,19 @@ const framekit::ProcessSpec* MultiprocessRuntime::FindProcessSpec(
 
 bool MultiprocessRuntime::ConsumeRestartBudget(const framekit::ProcessIdentity& identity) {
     const auto* process_spec = FindProcessSpec(identity);
-    if (!process_spec || !process_spec->auto_restart) {
+    if (!process_spec) {
+        last_error_ = "process spec not found for restart target";
+        return false;
+    }
+
+    if (!process_spec->auto_restart) {
+        last_error_ = "auto restart is disabled for process: " + process_spec->name;
         return false;
     }
 
     auto& restart_count = restart_attempt_counters_[process_spec->name];
     if (restart_count >= process_spec->max_restart_attempts) {
+        last_error_ = "restart budget exhausted for process: " + process_spec->name;
         return false;
     }
 
@@ -266,6 +371,7 @@ bool MultiprocessRuntime::ConsumeRestartBudget(const framekit::ProcessIdentity& 
 
 bool MultiprocessRuntime::GracefulStopChild(std::uint64_t process_id) {
     if (!process_launcher_) {
+        last_error_ = "process launcher is not configured";
         return false;
     }
 
@@ -289,6 +395,7 @@ bool MultiprocessRuntime::GracefulStopChild(std::uint64_t process_id) {
         }
 
         if (!stopped) {
+            last_error_ = "failed to stop child process";
             return false;
         }
 
@@ -298,10 +405,13 @@ bool MultiprocessRuntime::GracefulStopChild(std::uint64_t process_id) {
         return true;
     }
 
+    last_error_ = "child process not found";
     return false;
 }
 
 bool MultiprocessRuntime::RestartChild(std::uint64_t process_id) {
+    last_error_.clear();
+
     for (const auto& child : child_processes_) {
         if (child.process_id != process_id) {
             continue;
@@ -314,11 +424,13 @@ bool MultiprocessRuntime::RestartChild(std::uint64_t process_id) {
         return RelaunchChild(child);
     }
 
+    last_error_ = "child process not found for restart";
     return false;
 }
 
 bool MultiprocessRuntime::RelaunchChild(const framekit::ProcessIdentity& old_identity) {
     if (!process_launcher_) {
+        last_error_ = "process launcher is not configured";
         return false;
     }
 
@@ -327,6 +439,7 @@ bool MultiprocessRuntime::RelaunchChild(const framekit::ProcessIdentity& old_ide
     }
 
     if (!process_launcher_->StopChild(old_identity)) {
+        last_error_ = "failed to stop child process before restart";
         if (lifecycle_hooks_) {
             lifecycle_hooks_->OnRestartCompleted(old_identity, old_identity, false);
         }
@@ -350,6 +463,7 @@ bool MultiprocessRuntime::RelaunchChild(const framekit::ProcessIdentity& old_ide
 
             auto relaunched = process_launcher_->LaunchChild(parent_identity, spec);
             if (!relaunched.has_value() || !relaunched->running) {
+                last_error_ = "failed to relaunch child process";
                 if (lifecycle_hooks_) {
                     lifecycle_hooks_->OnRestartCompleted(old_identity, old_identity, false);
                 }
@@ -371,10 +485,13 @@ bool MultiprocessRuntime::RelaunchChild(const framekit::ProcessIdentity& old_ide
             if (lifecycle_hooks_) {
                 lifecycle_hooks_->OnRestartCompleted(old_identity, new_identity, true);
             }
+
+            last_error_.clear();
             return true;
         }
     }
 
+    last_error_ = "process spec not found for restart";
     if (lifecycle_hooks_) {
         lifecycle_hooks_->OnRestartCompleted(old_identity, old_identity, false);
     }
