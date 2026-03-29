@@ -2,7 +2,7 @@
 
 ## FrameKit v2.0.0
 
-Status: Draft
+Status: Published
 Last Updated: 2026-03-29
 
 ### Summary
@@ -27,5 +27,5 @@ It replaces the earlier baseline with a contracts-first, incompatible release.
 
 - CI expansion issue: #107
 - Release cutover issue: #108
-- Release promotion PR: pending
-- Signed tag: pending
+- Release promotion PR: #111
+- Signed tag: v2.0.0
