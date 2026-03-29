@@ -41,14 +41,16 @@ Default stage order for the baseline host loop:
 
 Profiles constrain stage usage and default policy behavior.
 
-### GUI Interactive
+Canonical profile names are: GUI, Headless, Hybrid, and Deterministic Host.
+
+### GUI (Interactive)
 
 - Target: desktop UI and graphics-forward hosts.
 - Required stages: all baseline stages.
-- Defaults: variable timing, soft overrun handling, single-threaded or split
+- Defaults: variable timing, `slip` overrun mode, single-threaded or split
   update/render.
 
-### Headless Service
+### Headless
 
 - Target: service/automation hosts without window rendering.
 - Required stages: BeginFrame, ProcessPlatformEvents, NormalizeInput,
@@ -58,7 +60,7 @@ Profiles constrain stage usage and default policy behavior.
 - Defaults: externally-clocked or fixed timing, bounded catch-up overrun mode,
   single-threaded.
 
-### Hybrid Tool
+### Hybrid
 
 - Target: tooling applications mixing interactive views and background work.
 - Required stages: all baseline stages.
@@ -88,7 +90,8 @@ Loop policy is expressed using three orthogonal dimensions.
 
 - `slip`: process one step and allow frame drift.
 - `catch_up_bounded`: run bounded extra update steps to reduce drift.
-- `drop_noncritical`: skip noncritical work stages as policy allows.
+- `drop_noncritical`: skip only stages that are explicitly marked optional or
+  degradable by the active profile and policy.
 - `fail_fast`: treat sustained overrun as a contract failure.
 
 ### Threading Mode
@@ -102,12 +105,15 @@ Loop policy is expressed using three orthogonal dimensions.
 - `fixed_delta` + `catch_up_bounded` requires an explicit max catch-up step
   budget.
 - `fail_fast` cannot silently degrade to `slip`.
+- `drop_noncritical` must preserve non-optional ordering guarantees, including
+  `PreUpdate`/`Update`/`PostUpdate` and, when rendering is enabled,
+  `PreRender`/`Render`/`PostRender` wrapper integrity.
 - `host_managed` must preserve baseline stage ordering guarantees.
 - Any profile-specific optional stage disablement must be declared in policy.
 
 ## Acceptance Mapping
 
 - Baseline stage graph documented: see Baseline Stage Graph.
-- Profiles documented: GUI Interactive, Headless Service, Hybrid Tool,
+- Profiles documented: GUI, Headless, Hybrid,
   Deterministic Host.
 - Policy contract documented: Timing Mode, Overrun Mode, Threading Mode.

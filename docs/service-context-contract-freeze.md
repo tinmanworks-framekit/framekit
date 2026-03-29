@@ -20,6 +20,23 @@ Service context phases:
 2. Frozen (registration prohibited)
 3. Teardown (lookup and usage wind-down)
 
+### Lifecycle Mapping
+
+- Open maps to Bootstrapping and Initializing.
+- Frozen maps to Running and early Stopping.
+- Teardown maps to service teardown during Stopping through Stopped.
+- Registration is prohibited after the first freeze transition for the
+  remainder of the host start cycle.
+
+### Service Identity
+
+Service registration and lookup identity is the tuple:
+
+- Contract type (required).
+- Service key (optional string token; empty key is the default binding).
+
+Uniqueness is enforced on the full `(contract type, service key)` tuple.
+
 ## Registration Window
 
 Registration window rules:
@@ -38,6 +55,19 @@ Freeze point rules:
 - Freeze occurs before entering Running state.
 - After freeze, registry membership is immutable.
 - Freeze completion is observable for diagnostics/testing.
+
+## Teardown Semantics
+
+Teardown transition and operation rules:
+
+- Frozen transitions to Teardown when host shutdown begins service teardown.
+- During Teardown, registration remains prohibited and registry membership
+  remains immutable.
+- Required runtime lookups are rejected once Teardown begins; shutdown code
+  must use dependencies resolved before Teardown.
+- Optional diagnostic lookups may be permitted by policy only for services not
+  yet torn down.
+- Teardown completes when service teardown sequence is finished.
 
 ## Typed Lookup Semantics
 
@@ -64,19 +94,30 @@ Ownership model rules:
 Thread-safety expectations:
 
 - Registration and freeze transitions are single-writer operations.
-- Read-only lookup after freeze is safe for concurrent access when host policy
-  enables multithreaded execution.
+- `single_threaded`: registration, freeze, and lookup occur on one thread in
+  program order.
+- `split_update_render`: freeze completion must happen-before any concurrent
+  lookup on render threads.
+- `host_managed`: host must guarantee freeze completion happens-before any
+  concurrent lookup and no post-freeze mutation while lookups are active.
+- Read-only lookup against a frozen registry is safe for concurrent access
+  under the above ordering constraints.
 - Any mutable service state remains the responsibility of service
   implementation; registry guarantees do not imply object-level thread safety.
-- Host-managed threading mode must preserve freeze-before-concurrent-lookup
-  ordering.
+
+## Diagnostics Severity Taxonomy
+
+- `diagnostic-warning`: non-fatal policy deviation; system remains operational.
+- `diagnostic-error`: contract violation requiring explicit operator/developer
+  visibility; escalation behavior is policy-driven.
+- `diagnostic-fatal`: non-recoverable contract violation requiring fail-fast.
 
 ## Failure Semantics
 
 - Registration after freeze is a contract error.
 - Required service missing at startup transitions host to fault handling.
-- Ownership/lifetime violations are diagnostics-level errors and may escalate
-  to fail-fast by policy.
+- Ownership/lifetime violations are `diagnostic-error` by default and may
+  escalate to fail-fast by policy.
 
 ## Acceptance Mapping
 

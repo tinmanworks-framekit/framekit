@@ -15,7 +15,8 @@ Each module exposes the following contract metadata:
 
 - Stable module identifier.
 - Declared dependency list (required and optional).
-- Lifecycle entry points for initialize, start, stop, and teardown.
+- Lifecycle entry points for `initialize`, `start`, `stop`, and `teardown`
+  callbacks.
 - Capability metadata for diagnostics and startup reporting.
 
 Dynamic module loading/discovery is out of scope for this contract.
@@ -35,11 +36,16 @@ Module lifecycle states:
 ### Lifecycle Rules
 
 - Declared modules transition to Resolved only after dependency resolution.
-- Resolved modules transition to Initializing in deterministic startup order.
-- Initializing transitions to Active only after successful startup callback.
-- Startup failure transitions module to Faulted and aborts further startup.
-- Active modules transition to Stopping when host shutdown begins.
-- Stopping modules transition to Stopped after teardown callback completion.
+- Resolved modules transition to Initializing in deterministic startup order and
+  invocation of the module `initialize` callback.
+- Initializing transitions to Active only after successful completion of the
+  module `start` callback.
+- Startup failure in either `initialize` or `start` transitions module to
+  Faulted and aborts further startup.
+- Active modules transition to Stopping when host shutdown begins and the
+  module `stop` callback is invoked.
+- Stopping modules transition to Stopped only after completion of `stop` and,
+  when implemented, `teardown` callbacks.
 - Faulted modules must not transition to Active without full host restart.
 
 ## Dependency DAG Semantics
@@ -63,22 +69,28 @@ Validation is fail-fast and deterministic.
 
 ### Deterministic Topological Order
 
-- Startup order is derived from topological sort of the validated DAG.
-- If multiple valid orders exist, tie-break by stable module identifier.
-- Order must be reproducible for identical module sets and declarations.
+- Let base order `T` be a deterministic topological order of the validated DAG
+  such that for each edge `consumer -> dependency`, the consumer appears before
+  the dependency in `T`.
+- If multiple valid base orders exist, tie-break by stable module identifier.
+- Startup order is `reverse(T)`, producing dependency-first startup.
+- For identical module sets and declarations, `T` and `reverse(T)` must be
+  reproducible.
 
 ## Startup Ordering Guarantees
 
 - A module starts only after all required dependencies are Active.
 - Optional dependency availability is observable but not required to start.
-- Startup proceeds in deterministic topological order.
+- Startup proceeds in deterministic dependency-first order (`reverse(T)`).
 - On startup fault, host transitions to fault handling semantics.
 
 ## Shutdown Semantics
 
 ### Reverse-Order Shutdown Rules
 
-- Shutdown order is reverse topological order of started modules.
+- Shutdown order follows base order `T` restricted to started modules (consumer
+  before dependency), which is equivalent to reversing the actual startup
+  sequence.
 - Dependents are stopped before their dependencies.
 - Each module receives stop/teardown callbacks at most once.
 - Shutdown continues best-effort after non-fatal module stop failures, while
