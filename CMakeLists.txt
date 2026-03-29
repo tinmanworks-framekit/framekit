@@ -17,6 +17,7 @@ add_library(framekit_core STATIC
     src/lifecycle_state_machine.cpp
     src/loop_policy.cpp
     src/loop_stage_graph.cpp
+    src/platform_host_runtime.cpp
     src/module_graph.cpp
     src/event_bus.cpp
     src/bootstrap_services.cpp
