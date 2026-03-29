@@ -16,6 +16,7 @@ add_library(framekit_core STATIC
     src/multiprocess_runtime.cpp
     src/lifecycle_state_machine.cpp
     src/loop_policy.cpp
+    src/fault_policy_runtime.cpp
     src/loop_stage_graph.cpp
     src/input_routing_runtime.cpp
     src/platform_host_runtime.cpp
