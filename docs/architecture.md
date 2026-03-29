@@ -16,3 +16,4 @@
 - [FrameKit v2 Stable Contract Inventory](v2-stable-contracts.md)
 - [Lifecycle and Shutdown Semantics](lifecycle-semantics.md)
 - [Loop Stage Graph and Profile/Policy Specification](loop-stage-graph-profiles.md)
+- [Module Contract and Dependency DAG Semantics](module-contract-dag-semantics.md)
