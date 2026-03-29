@@ -9,3 +9,7 @@
 - FrameKit defines app and multiprocess contracts.
 - NetKit provides optional transport implementations.
 - MediaKit remains optional and domain-specific.
+
+## Boundary Contracts
+- [FrameKit v2 Charter](charter-v2.md)
+- [External Integration Boundary Contract](integration-boundary.md)
