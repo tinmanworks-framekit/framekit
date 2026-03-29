@@ -11,3 +11,10 @@ add_executable(framekit_runtime_contract_primitives_test
 
 target_link_libraries(framekit_runtime_contract_primitives_test PRIVATE FrameKit::Core)
 add_test(NAME framekit_runtime_contract_primitives_test COMMAND framekit_runtime_contract_primitives_test)
+
+add_executable(framekit_loop_stage_graph_test
+    test_loop_stage_graph.cpp
+)
+
+target_link_libraries(framekit_loop_stage_graph_test PRIVATE FrameKit::Core)
+add_test(NAME framekit_loop_stage_graph_test COMMAND framekit_loop_stage_graph_test)

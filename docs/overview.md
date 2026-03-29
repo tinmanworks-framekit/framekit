@@ -8,6 +8,7 @@ Current baseline includes:
 - multiprocess runtime skeleton
 - lifecycle state machine and kernel runtime start/stop orchestration
 - loop profile and execution-policy validation contracts
+- loop stage graph runner with deterministic baseline-stage execution order
 - service context freeze/lookup semantics and teardown ordering
 - module dependency DAG validation with deterministic startup/shutdown ordering
 - event bus immediate/deferred dispatch baseline with consume and priority semantics

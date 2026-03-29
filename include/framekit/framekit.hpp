@@ -10,6 +10,7 @@
 #include "framekit/runtime/lifecycle_state.hpp"
 #include "framekit/runtime/lifecycle_state_machine.hpp"
 #include "framekit/runtime/loop_policy.hpp"
+#include "framekit/runtime/loop_stage_graph.hpp"
 #include "framekit/runtime/module_graph.hpp"
 #include "framekit/runtime/event_bus.hpp"
 #include "framekit/runtime/service_context.hpp"
