@@ -4,3 +4,10 @@ add_executable(framekit_contracts_test
 
 target_link_libraries(framekit_contracts_test PRIVATE FrameKit::Core)
 add_test(NAME framekit_contracts_test COMMAND framekit_contracts_test)
+
+add_executable(framekit_runtime_contract_primitives_test
+    test_runtime_contract_primitives.cpp
+)
+
+target_link_libraries(framekit_runtime_contract_primitives_test PRIVATE FrameKit::Core)
+add_test(NAME framekit_runtime_contract_primitives_test COMMAND framekit_runtime_contract_primitives_test)

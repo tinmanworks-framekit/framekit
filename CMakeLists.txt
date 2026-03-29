@@ -14,6 +14,12 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_library(framekit_core STATIC
     src/multiprocess_runtime.cpp
+    src/lifecycle_state_machine.cpp
+    src/loop_policy.cpp
+    src/module_graph.cpp
+    src/event_bus.cpp
+    src/bootstrap_services.cpp
+    src/kernel_runtime.cpp
 )
 add_library(FrameKit::Core ALIAS framekit_core)
 
