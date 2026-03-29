@@ -231,6 +231,22 @@ bool MultiprocessRuntime::LaunchChildren() {
     parent_identity.role_name = "primary";
     parent_identity.process_id = 1;
 
+    const auto rollback_launch_state = [this]() {
+        bool rollback_succeeded = true;
+
+        for (auto it = child_processes_.rbegin(); it != child_processes_.rend(); ++it) {
+            if (!process_launcher_->StopChild(*it)) {
+                rollback_succeeded = false;
+            }
+        }
+
+        child_processes_.clear();
+        child_handshakes_.clear();
+        heartbeat_counters_.clear();
+        restart_attempt_counters_.clear();
+        return rollback_succeeded;
+    };
+
     for (const auto& node : spec_.process_topology.nodes) {
         if (node.role == framekit::ProcessRole::kPrimary) {
             continue;
@@ -239,6 +255,11 @@ bool MultiprocessRuntime::LaunchChildren() {
         auto launched = process_launcher_->LaunchChild(parent_identity, node);
         if (!launched.has_value() || !launched->running) {
             last_error_ = "failed to launch child process: " + node.name;
+
+            if (!rollback_launch_state()) {
+                last_error_ += "; rollback stop failed";
+            }
+
             return false;
         }
 

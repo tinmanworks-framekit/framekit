@@ -25,6 +25,12 @@ public:
         const framekit::ProcessIdentity& parent,
         const framekit::ProcessSpec& spec) override {
         (void)parent;
+        launch_calls += 1;
+
+        if (!fail_launch_role_name.empty() && fail_launch_role_name == spec.name) {
+            return std::nullopt;
+        }
+
         framekit::runtime::ChildProcessHandle handle;
         handle.running = true;
         handle.identity.process_id = next_pid_++;
@@ -35,6 +41,7 @@ public:
     }
 
     bool StopChild(const framekit::ProcessIdentity& identity) override {
+        stop_calls += 1;
         for (auto it = running_.begin(); it != running_.end(); ++it) {
             if (it->process_id == identity.process_id) {
                 running_.erase(it);
@@ -47,6 +54,10 @@ public:
     std::vector<framekit::ProcessIdentity> RunningChildren() const override {
         return running_;
     }
+
+    int launch_calls = 0;
+    int stop_calls = 0;
+    std::string fail_launch_role_name;
 
 private:
     std::uint64_t next_pid_ = 42;
@@ -367,6 +378,35 @@ int main() {
     REQUIRE(disabled_restart_runtime.RestartAttemptCount("backend-no-restart") == 0);
     disabled_restart_runtime.Stop();
     REQUIRE(!disabled_restart_runtime.IsRunning());
+
+    framekit::ApplicationSpec partial_launch_failure_spec;
+    partial_launch_failure_spec.mode = framekit::AppMode::kMultiProcess;
+
+    framekit::ProcessSpec launch_backend_spec;
+    launch_backend_spec.name = "launch-backend";
+    launch_backend_spec.role = framekit::ProcessRole::kBackend;
+    launch_backend_spec.executable_path = "bin/launch_backend";
+    partial_launch_failure_spec.process_topology.nodes.push_back(launch_backend_spec);
+
+    framekit::ProcessSpec launch_worker_spec;
+    launch_worker_spec.name = "launch-worker";
+    launch_worker_spec.role = framekit::ProcessRole::kWorker;
+    launch_worker_spec.executable_path = "bin/launch_worker";
+    partial_launch_failure_spec.process_topology.nodes.push_back(launch_worker_spec);
+
+    framekit::runtime::MultiprocessRuntime partial_launch_failure_runtime;
+    auto partial_launch_failure_launcher = std::make_shared<FakeProcessLauncher>();
+    partial_launch_failure_launcher->fail_launch_role_name = "launch-worker";
+    partial_launch_failure_runtime.Configure(partial_launch_failure_spec);
+    partial_launch_failure_runtime.SetProcessLauncher(partial_launch_failure_launcher);
+
+    REQUIRE(!partial_launch_failure_runtime.Start());
+    REQUIRE(partial_launch_failure_runtime.LastError().find("failed to launch child process: launch-worker") != std::string::npos);
+    REQUIRE(partial_launch_failure_runtime.ChildProcesses().empty());
+    REQUIRE(partial_launch_failure_runtime.AllChildHandshakes().empty());
+    REQUIRE(partial_launch_failure_launcher->launch_calls == 2);
+    REQUIRE(partial_launch_failure_launcher->stop_calls == 1);
+    REQUIRE(partial_launch_failure_launcher->RunningChildren().empty());
 
     framekit::ApplicationSpec transport_spec;
     transport_spec.application_name = "framekit-transport-test";
