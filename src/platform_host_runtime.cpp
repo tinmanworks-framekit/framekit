@@ -1,8 +1,21 @@
 #include "framekit/platform/host_runtime.hpp"
+#include "platform_backend_factory_internal.hpp"
 
 #include <algorithm>
 
 namespace framekit::runtime {
+
+namespace {
+
+bool EligibleForCocoaAutoWire(const LoopPolicy& policy, bool has_render_stages) {
+    if (!has_render_stages) {
+        return false;
+    }
+
+    return policy.profile == LoopProfile::kGui || policy.profile == LoopProfile::kHybrid;
+}
+
+} // namespace
 
 void PlatformHostRuntime::SetPlatformHost(std::shared_ptr<IPlatformHost> host) {
     platform_host_ = std::move(host);
@@ -183,6 +196,18 @@ bool PlatformHostRuntime::Start() {
         return false;
     }
 
+    const bool has_render_stages = HasActiveRenderStages();
+    const bool can_auto_wire_cocoa =
+        !platform_host_ &&
+        !window_host_ &&
+        EligibleForCocoaAutoWire(policy_, has_render_stages) &&
+        detail::CocoaBackendAvailable();
+
+    if (can_auto_wire_cocoa) {
+        platform_host_ = detail::CreateCocoaPlatformHost();
+        window_host_ = detail::CreateCocoaWindowHost();
+    }
+
     if (!platform_host_) {
         last_error_ = "platform host is required";
         return false;
@@ -193,7 +218,7 @@ bool PlatformHostRuntime::Start() {
         return false;
     }
 
-    if (HasActiveRenderStages()) {
+    if (has_render_stages) {
         if (!window_host_) {
             last_error_ = "window host is required when render stages are active";
             return false;
