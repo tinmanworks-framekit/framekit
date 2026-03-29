@@ -19,4 +19,4 @@ It reviews alignment between the implemented contracts located across `include/f
 - `include/framekit/loop/stage_graph.hpp` and `include/framekit/loop/policy.hpp` fully cover constraints defined in `loop-stage-graph-profiles.md`.
 - `include/framekit/ipc/*` and `include/framekit/multiprocess/*` headers match transport selection behaviors dictated by `integration-boundary.md` and Phase 2 specifications.
 
-All discrepancies resolved and verified against the FrameKit v0.1.0 boundary layout.
+All discrepancies resolved and verified against the FrameKit v2.0.0 boundary layout.
