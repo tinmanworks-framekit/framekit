@@ -1,5 +1,42 @@
 #include "framekit/multiprocess/runtime.hpp"
 
+#include <algorithm>
+
+namespace {
+
+class DefaultSupervisorPolicy final : public framekit::runtime::ISupervisorPolicy {
+public:
+    bool ShouldRestart(const framekit::ProcessIdentity& identity, int exit_code) override {
+        (void)identity;
+        (void)exit_code;
+        return true;
+    }
+
+    void OnHeartbeatMissed(const framekit::ProcessIdentity& identity) override {
+        (void)identity;
+    }
+
+    void OnStopped(const framekit::ProcessIdentity& identity) override {
+        (void)identity;
+    }
+};
+
+class DefaultLivenessPolicy final : public framekit::runtime::ILivenessPolicy {
+public:
+    void OnHeartbeat(const framekit::runtime::HeartbeatEvent& event) override {
+        (void)event;
+    }
+
+    bool IsProcessAlive(
+        const framekit::ProcessIdentity& identity,
+        std::uint64_t observed_heartbeat_count) const override {
+        (void)identity;
+        return observed_heartbeat_count > 0;
+    }
+};
+
+} // namespace
+
 namespace framekit::runtime {
 
 void MultiprocessRuntime::Configure(const framekit::ApplicationSpec& spec) {
@@ -27,6 +64,14 @@ bool MultiprocessRuntime::Start() {
         return false;
     }
 
+    if (!supervisor_policy_) {
+        supervisor_policy_ = std::make_shared<DefaultSupervisorPolicy>();
+    }
+
+    if (!liveness_policy_) {
+        liveness_policy_ = std::make_shared<DefaultLivenessPolicy>();
+    }
+
     if (spec_.mode == framekit::AppMode::kMultiProcess && !LaunchChildren()) {
         return false;
     }
@@ -36,18 +81,38 @@ bool MultiprocessRuntime::Start() {
 }
 
 void MultiprocessRuntime::Tick() {
-    if (!supervisor_policy_ || !liveness_policy_) {
+    if (!running_ || !supervisor_policy_ || !liveness_policy_) {
         return;
     }
 
+    std::vector<std::uint64_t> process_ids;
+    process_ids.reserve(child_processes_.size());
     for (const auto& child : child_processes_) {
-        const auto heartbeat_count = HeartbeatCount(child.process_id);
-        if (!liveness_policy_->IsProcessAlive(child, heartbeat_count)) {
-            supervisor_policy_->OnHeartbeatMissed(child);
-        }
+        process_ids.push_back(child.process_id);
     }
 
-    (void)spec_;
+    for (const auto process_id : process_ids) {
+        const auto child_it = std::find_if(
+            child_processes_.begin(),
+            child_processes_.end(),
+            [process_id](const framekit::ProcessIdentity& identity) {
+                return identity.process_id == process_id;
+            });
+
+        if (child_it == child_processes_.end()) {
+            continue;
+        }
+
+        const auto child = *child_it;
+        const auto heartbeat_count = HeartbeatCount(process_id);
+        if (!liveness_policy_->IsProcessAlive(child, heartbeat_count)) {
+            supervisor_policy_->OnHeartbeatMissed(child);
+
+            if (supervisor_policy_->ShouldRestart(child, -1)) {
+                (void)RestartChild(process_id);
+            }
+        }
+    }
 }
 
 void MultiprocessRuntime::Stop() {
@@ -65,11 +130,15 @@ void MultiprocessRuntime::Stop() {
     child_processes_.clear();
     child_handshakes_.clear();
     heartbeat_counters_.clear();
+    restart_attempt_counters_.clear();
 }
 
 bool MultiprocessRuntime::LaunchChildren() {
     child_processes_.clear();
     child_handshakes_.clear();
+    heartbeat_counters_.clear();
+    restart_attempt_counters_.clear();
+
     if (!process_launcher_) {
         return spec_.process_topology.nodes.empty();
     }
@@ -88,9 +157,11 @@ bool MultiprocessRuntime::LaunchChildren() {
         if (!launched.has_value() || !launched->running) {
             return false;
         }
+
         child_processes_.push_back(launched->identity);
         SetChildHandshakeState(launched->identity.process_id, ChildHandshakeState::kSpawned);
         heartbeat_counters_[launched->identity.process_id] = 0;
+        restart_attempt_counters_[node.name] = 0;
     }
 
     return true;
@@ -158,6 +229,41 @@ std::uint64_t MultiprocessRuntime::HeartbeatCount(std::uint64_t process_id) cons
     return it->second;
 }
 
+std::uint32_t MultiprocessRuntime::RestartAttemptCount(const std::string& process_name) const {
+    const auto it = restart_attempt_counters_.find(process_name);
+    if (it == restart_attempt_counters_.end()) {
+        return 0;
+    }
+
+    return it->second;
+}
+
+const framekit::ProcessSpec* MultiprocessRuntime::FindProcessSpec(
+    const framekit::ProcessIdentity& identity) const {
+    for (const auto& spec : spec_.process_topology.nodes) {
+        if (spec.name == identity.role_name && spec.role == identity.role) {
+            return &spec;
+        }
+    }
+
+    return nullptr;
+}
+
+bool MultiprocessRuntime::ConsumeRestartBudget(const framekit::ProcessIdentity& identity) {
+    const auto* process_spec = FindProcessSpec(identity);
+    if (!process_spec || !process_spec->auto_restart) {
+        return false;
+    }
+
+    auto& restart_count = restart_attempt_counters_[process_spec->name];
+    if (restart_count >= process_spec->max_restart_attempts) {
+        return false;
+    }
+
+    restart_count += 1;
+    return true;
+}
+
 bool MultiprocessRuntime::GracefulStopChild(std::uint64_t process_id) {
     if (!process_launcher_) {
         return false;
@@ -200,8 +306,14 @@ bool MultiprocessRuntime::RestartChild(std::uint64_t process_id) {
         if (child.process_id != process_id) {
             continue;
         }
+
+        if (!ConsumeRestartBudget(child)) {
+            return false;
+        }
+
         return RelaunchChild(child);
     }
+
     return false;
 }
 
