@@ -24,5 +24,6 @@ This repository follows Tinman Doctrine.
    - Prefer small, unambiguous issues; split broad tasks into manageable subtasks
    - Keep commits small and issue-scoped; default to one issue -> one small commit set
    - Exceptions are allowed for non-diff tasks, discovery-first work, or unavoidable architecture-level changes; document rationale in the issue or PR
+   - Do not push directly to protected branches (`master`, `develop`); use PR flow even when operating with admin credentials or AI automation
    - Ensure lint/tests/build pass for touched areas
 5. If local repo policy conflicts with doctrine snapshot, follow local repo files and call out the conflict explicitly.
