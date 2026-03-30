@@ -125,13 +125,15 @@ void TestServiceContext() {
     REQUIRE(services.BeginTeardown());
     REQUIRE(services.Phase() == framekit::runtime::ServiceContextPhase::kTeardown);
     REQUIRE(services.Find<TestService>() == nullptr);
+    REQUIRE(services.ServiceCount() == 1);
 
-    const auto& order = services.LastTeardownOrder();
+    const auto order = services.LastTeardownOrder();
     REQUIRE(order.size() == 1);
     REQUIRE(order.front().contract_type == std::type_index(typeid(TestService)));
 
     REQUIRE(services.ResetForNextStartCycle());
     REQUIRE(services.Phase() == framekit::runtime::ServiceContextPhase::kOpen);
+    REQUIRE(services.ServiceCount() == 0);
 }
 
 void TestModuleGraphValidation() {
@@ -194,6 +196,19 @@ void TestModuleGraphValidation() {
     REQUIRE(!missing_result.valid);
     REQUIRE(!missing_result.errors.empty());
     REQUIRE(missing_result.errors.front().code == framekit::runtime::ModuleGraphErrorCode::kMissingRequiredDependency);
+
+    const std::vector<framekit::runtime::ModuleSpec> invalid_module_id = {
+        framekit::runtime::ModuleSpec{
+            .id = "",
+            .required_dependencies = {},
+            .optional_dependencies = {},
+        },
+    };
+
+    const auto invalid_id_result = framekit::runtime::ValidateModuleGraph(invalid_module_id);
+    REQUIRE(!invalid_id_result.valid);
+    REQUIRE(!invalid_id_result.errors.empty());
+    REQUIRE(invalid_id_result.errors.front().code == framekit::runtime::ModuleGraphErrorCode::kInvalidModuleId);
 }
 
 void TestEventBusSemantics() {

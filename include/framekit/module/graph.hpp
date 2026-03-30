@@ -19,6 +19,7 @@ enum class ModuleGraphErrorCode : std::uint8_t {
     kCycleDetected = 3,
     kSelfDependency = 4,
     kDuplicateDependencyEntry = 5,
+    kInvalidModuleId = 6,
 };
 
 struct ModuleGraphError {
