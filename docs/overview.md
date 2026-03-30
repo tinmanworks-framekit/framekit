@@ -17,6 +17,11 @@ Current baseline includes:
 - event bus immediate/deferred dispatch baseline with consume and priority semantics
 - selective-linking guidance for optional module usage
 
+Platform validation coverage includes:
+- Linux and macOS CMake build + contract test coverage in CI
+- macOS Cocoa backend validation in CI with `FRAMEKIT_ENABLE_COCOA=ON`
+- deterministic macOS launch checks for `framekit_single_process_example` and `framekit_multi_worker_example`
+
 Public include layout is organized by concern under `include/framekit/`:
 - `spec/`, `lifecycle/`, `loop/`, `platform/`, `input/`, `event/`, `module/`, `service/`, `fault/`, `kernel/`, `multiprocess/`, and `ipc/`
 
