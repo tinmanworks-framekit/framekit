@@ -1,9 +1,11 @@
 #pragma once
 
 #include <algorithm>
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <shared_mutex>
+#include <stdexcept>
 #include <string>
 #include <typeindex>
 #include <unordered_map>
@@ -67,10 +69,12 @@ public:
         };
 
         std::vector<OrderedEntry> ordered;
+        std::unordered_map<ServiceKey, ServiceEntry, ServiceKeyHasher> external_entries;
         ordered.reserve(entries_.size());
 
         for (const auto& [service_key, entry] : entries_) {
             if (entry.ownership != ServiceOwnership::kContextOwned) {
+                external_entries.emplace(service_key, entry);
                 continue;
             }
 
@@ -98,7 +102,7 @@ public:
             });
         }
 
-        entries_.clear();
+        entries_ = std::move(external_entries);
         return true;
     }
 
@@ -124,7 +128,8 @@ public:
         return entries_.size();
     }
 
-    const std::vector<ServiceTeardownRecord>& LastTeardownOrder() const {
+    std::vector<ServiceTeardownRecord> LastTeardownOrder() const {
+        std::shared_lock lock(mutex_);
         return last_teardown_order_;
     }
 
