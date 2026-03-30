@@ -51,13 +51,18 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Configure
-        run: cmake -S . -B build -DFRAMEKIT_BUILD_TESTS=ON -DFRAMEKIT_BUILD_EXAMPLES=ON -DFRAMEKIT_ENABLE_NETKIT=OFF -DCMAKE_BUILD_TYPE=Release
+        run: cmake -S . -B build -DFRAMEKIT_BUILD_TESTS=ON -DFRAMEKIT_BUILD_EXAMPLES=ON -DFRAMEKIT_ENABLE_NETKIT=OFF -DFRAMEKIT_ENABLE_COCOA=ON -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
         run: cmake --build build
 
       - name: Test
         run: ctest --test-dir build --output-on-failure
+
+      - name: Launch examples (macOS)
+        run: |
+          ./build/framekit_single_process_example
+          ./build/framekit_multi_worker_example
 
   framekit-with-netkit:
     name: netkit-shmpipe
@@ -97,7 +102,7 @@ jobs:
           path: netkit
 
       - name: Configure
-        run: cmake -S . -B build -DFRAMEKIT_BUILD_TESTS=ON -DFRAMEKIT_BUILD_EXAMPLES=ON -DFRAMEKIT_ENABLE_NETKIT=ON -DFRAMEKIT_NETKIT_SOURCE_DIR=${{ github.workspace }}/netkit -DCMAKE_BUILD_TYPE=Release
+        run: cmake -S . -B build -DFRAMEKIT_BUILD_TESTS=ON -DFRAMEKIT_BUILD_EXAMPLES=ON -DFRAMEKIT_ENABLE_NETKIT=ON -DFRAMEKIT_ENABLE_COCOA=ON -DFRAMEKIT_NETKIT_SOURCE_DIR=${{ github.workspace }}/netkit -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
         run: cmake --build build
