@@ -104,8 +104,9 @@ void TestServiceContext() {
 
     REQUIRE(services.Register<TestService>(test_service));
     REQUIRE(!services.Register<TestService>(std::make_shared<TestService>()));
+    auto external_alt = std::make_shared<AlternateService>(AlternateService{"alt"});
     REQUIRE(services.Register<AlternateService>(
-        std::make_shared<AlternateService>(AlternateService{"alt"}),
+        external_alt,
         "alt",
         framekit::runtime::ServiceOwnership::kExternalOwned));
 
@@ -121,6 +122,10 @@ void TestServiceContext() {
     auto alt = services.Find<AlternateService>("alt");
     REQUIRE(alt != nullptr);
     REQUIRE(alt->name == "alt");
+
+    alt.reset();
+    external_alt.reset();
+    REQUIRE(services.Find<AlternateService>("alt") == nullptr);
 
     REQUIRE(services.BeginTeardown());
     REQUIRE(services.Phase() == framekit::runtime::ServiceContextPhase::kTeardown);
