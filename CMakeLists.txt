@@ -111,6 +111,20 @@ if(FRAMEKIT_ENABLE_NETKIT)
             examples/frontend_backend/backend_main.cpp
         )
         target_link_libraries(framekit_backend_example PRIVATE FrameKit::Core NetKit::Transport)
+
+        if(FRAMEKIT_BUILD_TESTS)
+            add_test(NAME framekit_example_launch_frontend
+                COMMAND framekit_frontend_example
+            )
+            add_test(NAME framekit_example_launch_backend
+                COMMAND framekit_backend_example
+            )
+            set_tests_properties(
+                framekit_example_launch_frontend
+                framekit_example_launch_backend
+                PROPERTIES LABELS "integration-example;example-launch;integration;netkit"
+            )
+        endif()
     elseif(FRAMEKIT_BUILD_EXAMPLES)
         message(WARNING "FRAMEKIT_ENABLE_NETKIT=ON but NetKit::Transport was not found; skipping netkit examples")
     endif()

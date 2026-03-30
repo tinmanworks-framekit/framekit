@@ -50,8 +50,8 @@ external runtime repositories.
 - Core composition paths validate with FrameKit CI build/test coverage.
 - Cocoa-enabled macOS paths validate launch checks through CTest `example-launch`
   labels.
-- NetKit-backed examples validate by enabling NetKit and building/running the
-  frontend/backend examples.
+- NetKit-backed examples validate through CTest `integration-example` labels in
+  NetKit-enabled CI jobs.
 
 ## Boundary Alignment
 

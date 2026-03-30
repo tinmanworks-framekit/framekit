@@ -83,10 +83,10 @@ jobs:
         run: cmake --build build
 
       - name: Test
-        run: ctest --test-dir build --output-on-failure -LE example-launch
+        run: ctest --test-dir build --output-on-failure -LE integration-example
 
-      - name: Launch examples (macOS)
-        run: ctest --test-dir build --output-on-failure -L example-launch
+      - name: Launch integration examples
+        run: ctest --test-dir build --output-on-failure -L integration-example
 
   framekit-with-netkit-macos:
     name: netkit-shmpipe-macos
@@ -109,7 +109,10 @@ jobs:
         run: cmake --build build
 
       - name: Test
-        run: ctest --test-dir build --output-on-failure
+        run: ctest --test-dir build --output-on-failure -LE example-launch
+
+      - name: Launch examples (macOS)
+        run: ctest --test-dir build --output-on-failure -L integration-example
 
   sanitizer-linux:
     name: sanitizer-linux-clang
