@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <any>
+#include <chrono>
 #include <cstdlib>
 #include <iostream>
 #include <memory>
@@ -28,6 +29,38 @@ struct TestService {
 
 struct AlternateService {
     std::string name;
+};
+
+class FakeExecutionService : public framekit::runtime::IExecutionService {
+public:
+    bool Submit(std::function<void()> task) override {
+        submit_calls += 1;
+        if (!accept_submit) {
+            return false;
+        }
+        if (task) {
+            task();
+        }
+        return true;
+    }
+
+    bool BeginShutdown() override {
+        begin_shutdown_calls += 1;
+        return begin_shutdown_result;
+    }
+
+    bool AwaitShutdown(std::chrono::milliseconds timeout) override {
+        (void)timeout;
+        await_shutdown_calls += 1;
+        return await_shutdown_result;
+    }
+
+    int submit_calls = 0;
+    int begin_shutdown_calls = 0;
+    int await_shutdown_calls = 0;
+    bool accept_submit = true;
+    bool begin_shutdown_result = true;
+    bool await_shutdown_result = true;
 };
 
 const char* ModuleLifecyclePhaseName(framekit::runtime::ModuleLifecyclePhase phase) {
@@ -139,6 +172,60 @@ void TestServiceContext() {
     REQUIRE(services.ResetForNextStartCycle());
     REQUIRE(services.Phase() == framekit::runtime::ServiceContextPhase::kOpen);
     REQUIRE(services.ServiceCount() == 0);
+}
+
+void TestExecutionServiceRegistry() {
+    framekit::runtime::ExecutionServiceRegistry registry;
+
+    auto first = std::make_shared<FakeExecutionService>();
+    auto second = std::make_shared<FakeExecutionService>();
+    auto external = std::make_shared<FakeExecutionService>();
+
+    REQUIRE(registry.Register(first, "first"));
+    REQUIRE(!registry.Register(std::make_shared<FakeExecutionService>(), "first"));
+    REQUIRE(registry.Register(second, "second"));
+    REQUIRE(registry.Register(
+        external,
+        "external",
+        framekit::runtime::ExecutionServiceOwnership::kExternalOwned));
+
+    REQUIRE(registry.Freeze());
+    REQUIRE(registry.Phase() == framekit::runtime::ExecutionServicePhase::kFrozen);
+    REQUIRE(registry.FreezeCount() == 1);
+    REQUIRE(!registry.Register(std::make_shared<FakeExecutionService>(), "late"));
+
+    auto found_first = registry.Find("first");
+    REQUIRE(found_first != nullptr);
+    auto found_external = registry.Find("external");
+    REQUIRE(found_external != nullptr);
+
+    found_external.reset();
+    external.reset();
+    REQUIRE(registry.Find("external") == nullptr);
+
+    REQUIRE(registry.BeginShutdown(std::chrono::milliseconds{0}));
+    REQUIRE(registry.Phase() == framekit::runtime::ExecutionServicePhase::kShuttingDown);
+    REQUIRE(registry.Find("first") == nullptr);
+    REQUIRE(first->begin_shutdown_calls == 1);
+    REQUIRE(first->await_shutdown_calls == 1);
+    REQUIRE(second->begin_shutdown_calls == 1);
+    REQUIRE(second->await_shutdown_calls == 1);
+    REQUIRE(registry.ServiceCount() == 1);
+
+    const auto shutdown_order = registry.LastShutdownOrder();
+    REQUIRE(shutdown_order.size() == 2);
+    REQUIRE(shutdown_order[0].key == "second");
+    REQUIRE(shutdown_order[1].key == "first");
+
+    REQUIRE(registry.ResetForNextStartCycle());
+    REQUIRE(registry.Phase() == framekit::runtime::ExecutionServicePhase::kOpen);
+    REQUIRE(registry.ServiceCount() == 0);
+
+    framekit::runtime::ExecutionServiceRegistry failure_registry;
+    auto failure_service = std::make_shared<FakeExecutionService>();
+    failure_service->await_shutdown_result = false;
+    REQUIRE(failure_registry.Register(failure_service, "failure"));
+    REQUIRE(!failure_registry.BeginShutdown(std::chrono::milliseconds{0}));
 }
 
 void TestModuleGraphValidation() {
@@ -473,6 +560,7 @@ int main() {
     TestLifecycleStateMachine();
     TestLoopPolicyValidation();
     TestServiceContext();
+    TestExecutionServiceRegistry();
     TestModuleGraphValidation();
     TestEventBusSemantics();
     TestKernelRuntime();
