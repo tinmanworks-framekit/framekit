@@ -383,6 +383,43 @@ void TestModuleGraphValidation() {
     REQUIRE(invalid_id_result.errors.front().code == framekit::runtime::ModuleGraphErrorCode::kInvalidModuleId);
 }
 
+void TestDynamicModuleManifestValidation() {
+    framekit::runtime::DynamicModuleManifest manifest;
+    manifest.module_id = "dynamic-ui";
+    manifest.module_version = "1.0.0";
+    manifest.required_dependencies = {"core"};
+    manifest.optional_dependencies = {"telemetry"};
+
+    std::string error;
+    REQUIRE(framekit::runtime::ValidateDynamicModuleManifest(manifest, &error));
+    REQUIRE(error.empty());
+
+    framekit::runtime::DynamicModuleManifest empty_id = manifest;
+    empty_id.module_id.clear();
+    REQUIRE(!framekit::runtime::ValidateDynamicModuleManifest(empty_id, &error));
+    REQUIRE(error.find("non-empty") != std::string::npos);
+
+    framekit::runtime::DynamicModuleManifest missing_version = manifest;
+    missing_version.module_version.clear();
+    REQUIRE(!framekit::runtime::ValidateDynamicModuleManifest(missing_version, &error));
+    REQUIRE(error.find("version") != std::string::npos);
+
+    framekit::runtime::DynamicModuleManifest duplicate_required = manifest;
+    duplicate_required.required_dependencies = {"core", "core"};
+    REQUIRE(!framekit::runtime::ValidateDynamicModuleManifest(duplicate_required, &error));
+    REQUIRE(error.find("duplicate") != std::string::npos);
+
+    framekit::runtime::DynamicModuleManifest required_optional_overlap = manifest;
+    required_optional_overlap.optional_dependencies = {"core"};
+    REQUIRE(!framekit::runtime::ValidateDynamicModuleManifest(required_optional_overlap, &error));
+    REQUIRE(error.find("required and optional") != std::string::npos);
+
+    framekit::runtime::DynamicModuleManifest self_dependency = manifest;
+    self_dependency.required_dependencies = {"dynamic-ui"};
+    REQUIRE(!framekit::runtime::ValidateDynamicModuleManifest(self_dependency, &error));
+    REQUIRE(error.find("cannot require itself") != std::string::npos);
+}
+
 void TestEventBusSemantics() {
     framekit::runtime::EventBus bus;
 
@@ -643,6 +680,7 @@ int main() {
     TestExecutionServiceRegistry();
     TestInlineExecutionServiceSemantics();
     TestModuleGraphValidation();
+    TestDynamicModuleManifestValidation();
     TestEventBusSemantics();
     TestKernelRuntime();
     TestKernelRuntimeModuleLifecycleOrchestration();
