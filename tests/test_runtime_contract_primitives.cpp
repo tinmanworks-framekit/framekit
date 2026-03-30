@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -226,6 +227,49 @@ void TestExecutionServiceRegistry() {
     failure_service->await_shutdown_result = false;
     REQUIRE(failure_registry.Register(failure_service, "failure"));
     REQUIRE(!failure_registry.BeginShutdown(std::chrono::milliseconds{0}));
+}
+
+void TestInlineExecutionServiceSemantics() {
+    framekit::runtime::InlineExecutionService service;
+
+    int executed = 0;
+    const auto first = service.SubmitTask([&executed]() { executed += 1; });
+    const auto second = service.SubmitTask([&executed]() { executed += 10; });
+
+    REQUIRE(first.state == framekit::runtime::ExecutionTaskState::kQueued);
+    REQUIRE(second.state == framekit::runtime::ExecutionTaskState::kQueued);
+    REQUIRE(service.PendingCount() == 2);
+
+    REQUIRE(service.Cancel(second.task_id));
+    REQUIRE(service.PendingCount() == 1);
+    auto cancelled = service.FindResult(second.task_id);
+    REQUIRE(cancelled.has_value());
+    REQUIRE(cancelled->state == framekit::runtime::ExecutionTaskState::kCancelled);
+
+    const auto drained = service.Drain();
+    REQUIRE(drained.size() == 1);
+    REQUIRE(drained.front().task_id == first.task_id);
+    REQUIRE(drained.front().state == framekit::runtime::ExecutionTaskState::kCompleted);
+    REQUIRE(executed == 1);
+
+    auto completed = service.FindResult(first.task_id);
+    REQUIRE(completed.has_value());
+    REQUIRE(completed->state == framekit::runtime::ExecutionTaskState::kCompleted);
+
+    const auto faulty = service.SubmitTask([]() {
+        throw std::runtime_error("boom");
+    });
+    REQUIRE(faulty.state == framekit::runtime::ExecutionTaskState::kQueued);
+    const auto fault_results = service.Drain();
+    REQUIRE(fault_results.size() == 1);
+    REQUIRE(fault_results.front().state == framekit::runtime::ExecutionTaskState::kFailed);
+    REQUIRE(fault_results.front().detail == "boom");
+
+    REQUIRE(service.BeginShutdown());
+    REQUIRE(service.AwaitShutdown(std::chrono::milliseconds{0}));
+
+    const auto rejected = service.SubmitTask([]() {});
+    REQUIRE(rejected.state == framekit::runtime::ExecutionTaskState::kRejected);
 }
 
 void TestModuleGraphValidation() {
@@ -561,6 +605,7 @@ int main() {
     TestLoopPolicyValidation();
     TestServiceContext();
     TestExecutionServiceRegistry();
+    TestInlineExecutionServiceSemantics();
     TestModuleGraphValidation();
     TestEventBusSemantics();
     TestKernelRuntime();
