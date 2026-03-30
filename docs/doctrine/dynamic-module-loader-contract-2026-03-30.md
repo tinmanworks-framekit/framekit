@@ -25,6 +25,8 @@ Primary contract types:
 - `ValidateDynamicModuleManifest(...)`
 - `EvaluateDynamicLoadRequest(...)`
 - `EvaluateDynamicUnloadRequest(...)`
+- `BuildDynamicRollbackPlan(...)`
+- `AssessDynamicRollbackResult(...)`
 
 ## Baseline Rules
 
@@ -48,3 +50,10 @@ Primary contract types:
 - Runtime load/unload state integration and refusal semantics.
 - Rollback/fault handling for partial dynamic load failures.
 - Explicit unload restrictions and dependency-safe refusal paths.
+
+## Rollback Planning Notes
+
+- `BuildDynamicRollbackPlan(...)` derives deterministic reverse-order unload
+  steps for partially loaded dynamic modules.
+- `AssessDynamicRollbackResult(...)` classifies rollback success/failure to
+  support future fault escalation logic.

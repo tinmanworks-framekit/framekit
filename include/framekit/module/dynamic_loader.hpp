@@ -50,6 +50,18 @@ struct DynamicModuleDecision {
     std::string message;
 };
 
+struct DynamicModuleRollbackPlan {
+    bool required = false;
+    std::string failed_module_id;
+    std::vector<std::string> unload_order;
+};
+
+struct DynamicModuleRollbackResult {
+    bool success = true;
+    std::size_t unload_failures = 0;
+    std::vector<std::string> failed_unloads;
+};
+
 class IDynamicModuleLoader {
 public:
     virtual ~IDynamicModuleLoader() = default;
@@ -135,6 +147,51 @@ inline DynamicModuleDecision EvaluateDynamicUnloadRequest(
         .accepted = true,
         .refusal_reason = DynamicModuleRefusalReason::kNone,
         .message = "unload accepted",
+    };
+}
+
+inline DynamicModuleRollbackPlan BuildDynamicRollbackPlan(
+    const std::vector<std::string>& loaded_modules_in_order,
+    std::string_view failed_module_id) {
+    DynamicModuleRollbackPlan plan;
+    plan.failed_module_id = std::string(failed_module_id);
+
+    if (failed_module_id.empty()) {
+        return plan;
+    }
+
+    auto it = std::find(
+        loaded_modules_in_order.begin(),
+        loaded_modules_in_order.end(),
+        failed_module_id);
+    if (it == loaded_modules_in_order.end()) {
+        return plan;
+    }
+
+    plan.required = true;
+    for (auto reverse = loaded_modules_in_order.rbegin(); reverse != loaded_modules_in_order.rend(); ++reverse) {
+        plan.unload_order.push_back(*reverse);
+        if (*reverse == failed_module_id) {
+            break;
+        }
+    }
+
+    return plan;
+}
+
+inline DynamicModuleDecision AssessDynamicRollbackResult(const DynamicModuleRollbackResult& rollback_result) {
+    if (rollback_result.success && rollback_result.unload_failures == 0 && rollback_result.failed_unloads.empty()) {
+        return DynamicModuleDecision{
+            .accepted = true,
+            .refusal_reason = DynamicModuleRefusalReason::kNone,
+            .message = "rollback succeeded",
+        };
+    }
+
+    return DynamicModuleDecision{
+        .accepted = false,
+        .refusal_reason = DynamicModuleRefusalReason::kIllegalLifecycleState,
+        .message = "rollback left modules in a partially loaded state",
     };
 }
 
