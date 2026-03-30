@@ -60,3 +60,7 @@ repositories remain FrameKit-independent.
 
 NodeX is an example domain runtime system used to validate this boundary.
 The same separation rules apply to any external runtime.
+
+Companion integration guidance:
+
+- [Composition Matrix](composition-matrix.md)

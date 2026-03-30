@@ -1,6 +1,8 @@
 # Selective Linking Guide
 
 FrameKit supports optional linkage. You only link modules you explicitly enable.
+For composition-mode mapping and bridge responsibilities, see the
+[Composition Matrix](composition-matrix.md).
 
 ## 1) FrameKit core only (no NetKit)
 ```bash
@@ -32,3 +34,15 @@ Check linked libraries of your app:
 - Windows: `dumpbin /dependents <binary>`
 
 If NetKit is disabled, your FrameKit binaries should not link NetKit artifacts.
+
+## Composition Validation Paths
+
+- Single-process host validation:
+  - build with `FRAMEKIT_ENABLE_NETKIT=OFF`
+  - run `framekit_single_process_example`
+- Multiprocess host validation:
+  - build with `FRAMEKIT_ENABLE_NETKIT=OFF`
+  - run `framekit_multi_worker_example`
+- Transport-backed integration validation:
+  - build with `FRAMEKIT_ENABLE_NETKIT=ON`
+  - run `framekit_frontend_example` and `framekit_backend_example`

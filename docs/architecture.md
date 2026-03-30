@@ -15,6 +15,7 @@
 - [External Integration Boundary Contract](integration-boundary.md)
 - [FrameKit v2 Stable Contract Inventory](v2-stable-contracts.md)
 - [Platform Support Matrix](platform-support-matrix.md)
+- [Composition Matrix](composition-matrix.md)
 - [Lifecycle and Shutdown Semantics](lifecycle-semantics.md)
 - [Loop Stage Graph and Profile/Policy Specification](loop-stage-graph-profiles.md)
 - [Module Contract and Dependency DAG Semantics](module-contract-dag-semantics.md)
