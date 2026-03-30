@@ -57,12 +57,10 @@ jobs:
         run: cmake --build build
 
       - name: Test
-        run: ctest --test-dir build --output-on-failure
+        run: ctest --test-dir build --output-on-failure -LE example-launch
 
       - name: Launch examples (macOS)
-        run: |
-          ./build/framekit_single_process_example
-          ./build/framekit_multi_worker_example
+        run: ctest --test-dir build --output-on-failure -L example-launch
 
   framekit-with-netkit:
     name: netkit-shmpipe
@@ -85,7 +83,10 @@ jobs:
         run: cmake --build build
 
       - name: Test
-        run: ctest --test-dir build --output-on-failure
+        run: ctest --test-dir build --output-on-failure -LE example-launch
+
+      - name: Launch examples (macOS)
+        run: ctest --test-dir build --output-on-failure -L example-launch
 
   framekit-with-netkit-macos:
     name: netkit-shmpipe-macos
