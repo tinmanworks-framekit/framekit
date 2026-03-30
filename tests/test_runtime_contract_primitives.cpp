@@ -472,6 +472,50 @@ void TestDynamicLoadUnloadDecisionSemantics() {
     REQUIRE(unload_accepted.refusal_reason == framekit::runtime::DynamicModuleRefusalReason::kNone);
 }
 
+void TestDynamicRollbackSemantics() {
+    const std::vector<std::string> loaded_order = {
+        "core",
+        "render",
+        "dynamic-ui",
+    };
+
+    const auto plan = framekit::runtime::BuildDynamicRollbackPlan(loaded_order, "dynamic-ui");
+    REQUIRE(plan.required);
+    REQUIRE(plan.failed_module_id == "dynamic-ui");
+    REQUIRE(plan.unload_order.size() == 1);
+    REQUIRE(plan.unload_order[0] == "dynamic-ui");
+
+    const auto mid_plan = framekit::runtime::BuildDynamicRollbackPlan(loaded_order, "render");
+    REQUIRE(mid_plan.required);
+    REQUIRE(mid_plan.unload_order.size() == 2);
+    REQUIRE(mid_plan.unload_order[0] == "dynamic-ui");
+    REQUIRE(mid_plan.unload_order[1] == "render");
+
+    const auto missing_plan = framekit::runtime::BuildDynamicRollbackPlan(loaded_order, "missing");
+    REQUIRE(!missing_plan.required);
+    REQUIRE(missing_plan.unload_order.empty());
+
+    const auto empty_plan = framekit::runtime::BuildDynamicRollbackPlan(loaded_order, "");
+    REQUIRE(!empty_plan.required);
+
+    const auto rollback_ok = framekit::runtime::AssessDynamicRollbackResult(
+        framekit::runtime::DynamicModuleRollbackResult{
+            .success = true,
+            .unload_failures = 0,
+            .failed_unloads = {},
+        });
+    REQUIRE(rollback_ok.accepted);
+
+    const auto rollback_failed = framekit::runtime::AssessDynamicRollbackResult(
+        framekit::runtime::DynamicModuleRollbackResult{
+            .success = false,
+            .unload_failures = 1,
+            .failed_unloads = {"render"},
+        });
+    REQUIRE(!rollback_failed.accepted);
+    REQUIRE(rollback_failed.refusal_reason == framekit::runtime::DynamicModuleRefusalReason::kIllegalLifecycleState);
+}
+
 void TestEventBusSemantics() {
     framekit::runtime::EventBus bus;
 
@@ -734,6 +778,7 @@ int main() {
     TestModuleGraphValidation();
     TestDynamicModuleManifestValidation();
     TestDynamicLoadUnloadDecisionSemantics();
+    TestDynamicRollbackSemantics();
     TestEventBusSemantics();
     TestKernelRuntime();
     TestKernelRuntimeModuleLifecycleOrchestration();
