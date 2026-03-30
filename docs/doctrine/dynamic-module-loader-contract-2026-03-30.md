@@ -20,8 +20,11 @@ Primary contract types:
 - `DynamicModuleDecision`
 - `DynamicModuleRefusalReason`
 - `DynamicModuleLoadState`
+- `DynamicLoaderHostPhase`
 - `IDynamicModuleLoader`
 - `ValidateDynamicModuleManifest(...)`
+- `EvaluateDynamicLoadRequest(...)`
+- `EvaluateDynamicUnloadRequest(...)`
 
 ## Baseline Rules
 
@@ -37,6 +40,8 @@ Primary contract types:
 - No runtime behavior change is introduced for static baseline startup/shutdown.
 - Dynamic loading remains opt-in and inactive unless a future slice wires
   runtime integration hooks.
+- Load/unload decision helpers provide deterministic refusal reasons without
+  mutating baseline startup/shutdown behavior.
 
 ## Follow-up Slices
 
