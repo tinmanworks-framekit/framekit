@@ -48,6 +48,27 @@ struct ExecutionTaskResult {
     std::string detail;
 };
 
+enum class SchedulerPolicyKind : std::uint8_t {
+    kSingleThreaded = 0,
+    kFixedPool = 1,
+    kStageAffine = 2,
+};
+
+struct SchedulerPolicyConfig {
+    SchedulerPolicyKind kind = SchedulerPolicyKind::kSingleThreaded;
+    std::size_t worker_count = 1;
+    bool stage_affinity_enabled = false;
+};
+
+struct ExecutionServiceMetrics {
+    std::uint64_t submitted = 0;
+    std::uint64_t rejected = 0;
+    std::uint64_t cancelled = 0;
+    std::uint64_t completed = 0;
+    std::uint64_t failed = 0;
+    std::size_t pending = 0;
+};
+
 class IExecutionService {
 public:
     virtual ~IExecutionService() = default;
@@ -61,6 +82,22 @@ class InlineExecutionService final : public IExecutionService {
 public:
     InlineExecutionService() = default;
 
+    void ConfigurePolicy(SchedulerPolicyConfig policy) {
+        std::unique_lock lock(mutex_);
+        policy_ = std::move(policy);
+        if (policy_.kind == SchedulerPolicyKind::kSingleThreaded) {
+            policy_.worker_count = 1;
+            policy_.stage_affinity_enabled = false;
+        } else if (policy_.worker_count == 0) {
+            policy_.worker_count = 1;
+        }
+    }
+
+    SchedulerPolicyConfig Policy() const {
+        std::shared_lock lock(mutex_);
+        return policy_;
+    }
+
     bool Submit(std::function<void()> task) override {
         const auto result = SubmitTask(std::move(task));
         return result.state == ExecutionTaskState::kQueued;
@@ -70,6 +107,7 @@ public:
         std::unique_lock lock(mutex_);
 
         if (shutting_down_ || !task) {
+            metrics_.rejected += 1;
             return ExecutionTaskResult{
                 .task_id = 0,
                 .state = ExecutionTaskState::kRejected,
@@ -89,6 +127,8 @@ public:
             .detail = "queued",
         };
         results_[task_id] = queued;
+        metrics_.submitted += 1;
+        metrics_.pending = pending_.size();
         return queued;
     }
 
@@ -109,6 +149,8 @@ public:
                 .state = ExecutionTaskState::kCancelled,
                 .detail = "cancelled before execution",
             };
+            metrics_.cancelled += 1;
+            metrics_.pending = pending_.size();
             return true;
         }
 
@@ -120,6 +162,7 @@ public:
         {
             std::unique_lock lock(mutex_);
             to_run.swap(pending_);
+            metrics_.pending = pending_.size();
         }
 
         std::vector<ExecutionTaskResult> drained;
@@ -154,6 +197,11 @@ public:
             {
                 std::unique_lock lock(mutex_);
                 results_[pending.task_id] = outcome;
+                if (outcome.state == ExecutionTaskState::kCompleted) {
+                    metrics_.completed += 1;
+                } else if (outcome.state == ExecutionTaskState::kFailed) {
+                    metrics_.failed += 1;
+                }
             }
             drained.push_back(outcome);
         }
@@ -174,8 +222,10 @@ public:
                 .state = ExecutionTaskState::kCancelled,
                 .detail = "cancelled by shutdown",
             };
+            metrics_.cancelled += 1;
         }
         pending_.clear();
+        metrics_.pending = pending_.size();
         return true;
     }
 
@@ -200,6 +250,11 @@ public:
         return found->second;
     }
 
+    ExecutionServiceMetrics Metrics() const {
+        std::shared_lock lock(mutex_);
+        return metrics_;
+    }
+
 private:
     struct PendingTask {
         ExecutionTaskId task_id = 0;
@@ -208,6 +263,8 @@ private:
 
     mutable std::shared_mutex mutex_;
     bool shutting_down_ = false;
+    SchedulerPolicyConfig policy_;
+    ExecutionServiceMetrics metrics_;
     ExecutionTaskId next_task_id_ = 1;
     std::vector<PendingTask> pending_;
     std::unordered_map<ExecutionTaskId, ExecutionTaskResult> results_;

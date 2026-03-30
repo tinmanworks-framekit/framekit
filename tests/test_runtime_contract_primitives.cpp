@@ -232,6 +232,29 @@ void TestExecutionServiceRegistry() {
 void TestInlineExecutionServiceSemantics() {
     framekit::runtime::InlineExecutionService service;
 
+    const auto default_policy = service.Policy();
+    REQUIRE(default_policy.kind == framekit::runtime::SchedulerPolicyKind::kSingleThreaded);
+    REQUIRE(default_policy.worker_count == 1);
+
+    service.ConfigurePolicy(framekit::runtime::SchedulerPolicyConfig{
+        .kind = framekit::runtime::SchedulerPolicyKind::kFixedPool,
+        .worker_count = 4,
+        .stage_affinity_enabled = false,
+    });
+    auto fixed_pool = service.Policy();
+    REQUIRE(fixed_pool.kind == framekit::runtime::SchedulerPolicyKind::kFixedPool);
+    REQUIRE(fixed_pool.worker_count == 4);
+
+    service.ConfigurePolicy(framekit::runtime::SchedulerPolicyConfig{
+        .kind = framekit::runtime::SchedulerPolicyKind::kStageAffine,
+        .worker_count = 0,
+        .stage_affinity_enabled = true,
+    });
+    auto stage_affine = service.Policy();
+    REQUIRE(stage_affine.kind == framekit::runtime::SchedulerPolicyKind::kStageAffine);
+    REQUIRE(stage_affine.worker_count == 1);
+    REQUIRE(stage_affine.stage_affinity_enabled);
+
     int executed = 0;
     const auto first = service.SubmitTask([&executed]() { executed += 1; });
     const auto second = service.SubmitTask([&executed]() { executed += 10; });
@@ -239,9 +262,15 @@ void TestInlineExecutionServiceSemantics() {
     REQUIRE(first.state == framekit::runtime::ExecutionTaskState::kQueued);
     REQUIRE(second.state == framekit::runtime::ExecutionTaskState::kQueued);
     REQUIRE(service.PendingCount() == 2);
+    auto metrics = service.Metrics();
+    REQUIRE(metrics.submitted == 2);
+    REQUIRE(metrics.pending == 2);
 
     REQUIRE(service.Cancel(second.task_id));
     REQUIRE(service.PendingCount() == 1);
+    metrics = service.Metrics();
+    REQUIRE(metrics.cancelled == 1);
+    REQUIRE(metrics.pending == 1);
     auto cancelled = service.FindResult(second.task_id);
     REQUIRE(cancelled.has_value());
     REQUIRE(cancelled->state == framekit::runtime::ExecutionTaskState::kCancelled);
@@ -251,6 +280,9 @@ void TestInlineExecutionServiceSemantics() {
     REQUIRE(drained.front().task_id == first.task_id);
     REQUIRE(drained.front().state == framekit::runtime::ExecutionTaskState::kCompleted);
     REQUIRE(executed == 1);
+    metrics = service.Metrics();
+    REQUIRE(metrics.completed == 1);
+    REQUIRE(metrics.pending == 0);
 
     auto completed = service.FindResult(first.task_id);
     REQUIRE(completed.has_value());
@@ -264,12 +296,16 @@ void TestInlineExecutionServiceSemantics() {
     REQUIRE(fault_results.size() == 1);
     REQUIRE(fault_results.front().state == framekit::runtime::ExecutionTaskState::kFailed);
     REQUIRE(fault_results.front().detail == "boom");
+    metrics = service.Metrics();
+    REQUIRE(metrics.failed == 1);
 
     REQUIRE(service.BeginShutdown());
     REQUIRE(service.AwaitShutdown(std::chrono::milliseconds{0}));
 
     const auto rejected = service.SubmitTask([]() {});
     REQUIRE(rejected.state == framekit::runtime::ExecutionTaskState::kRejected);
+    metrics = service.Metrics();
+    REQUIRE(metrics.rejected == 1);
 }
 
 void TestModuleGraphValidation() {
