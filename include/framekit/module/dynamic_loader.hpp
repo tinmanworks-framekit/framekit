@@ -27,6 +27,14 @@ enum class DynamicModuleLoadState : std::uint8_t {
     kUnloaded = 5,
 };
 
+enum class DynamicLoaderHostPhase : std::uint8_t {
+    kBootstrapping = 0,
+    kInitializing = 1,
+    kRunning = 2,
+    kStopping = 3,
+    kStopped = 4,
+};
+
 struct DynamicModuleManifest {
     std::string module_id;
     std::string module_version;
@@ -50,6 +58,85 @@ public:
     virtual DynamicModuleDecision LoadModule(std::string_view module_id) = 0;
     virtual DynamicModuleDecision UnloadModule(std::string_view module_id) = 0;
 };
+
+inline DynamicModuleDecision EvaluateDynamicLoadRequest(
+    DynamicLoaderHostPhase host_phase,
+    bool module_already_registered,
+    bool dependencies_available) {
+    if (host_phase != DynamicLoaderHostPhase::kRunning) {
+        return DynamicModuleDecision{
+            .accepted = false,
+            .refusal_reason = DynamicModuleRefusalReason::kIllegalLifecycleState,
+            .message = "dynamic loading is only allowed while host phase is running",
+        };
+    }
+
+    if (module_already_registered) {
+        return DynamicModuleDecision{
+            .accepted = false,
+            .refusal_reason = DynamicModuleRefusalReason::kDuplicateModuleId,
+            .message = "module is already registered",
+        };
+    }
+
+    if (!dependencies_available) {
+        return DynamicModuleDecision{
+            .accepted = false,
+            .refusal_reason = DynamicModuleRefusalReason::kDependencyUnavailable,
+            .message = "required dependencies are unavailable",
+        };
+    }
+
+    return DynamicModuleDecision{
+        .accepted = true,
+        .refusal_reason = DynamicModuleRefusalReason::kNone,
+        .message = "load accepted",
+    };
+}
+
+inline DynamicModuleDecision EvaluateDynamicUnloadRequest(
+    DynamicLoaderHostPhase host_phase,
+    const DynamicModuleManifest& manifest,
+    bool module_is_loaded,
+    bool has_runtime_dependents) {
+    if (host_phase != DynamicLoaderHostPhase::kRunning) {
+        return DynamicModuleDecision{
+            .accepted = false,
+            .refusal_reason = DynamicModuleRefusalReason::kIllegalLifecycleState,
+            .message = "dynamic unload is only allowed while host phase is running",
+        };
+    }
+
+    if (!module_is_loaded) {
+        return DynamicModuleDecision{
+            .accepted = false,
+            .refusal_reason = DynamicModuleRefusalReason::kIllegalLifecycleState,
+            .message = "module is not loaded",
+        };
+    }
+
+    if (!manifest.hot_unload_allowed) {
+        return DynamicModuleDecision{
+            .accepted = false,
+            .refusal_reason = DynamicModuleRefusalReason::kUnloadNotAllowed,
+            .message = "module manifest does not allow hot unload",
+        };
+    }
+
+    if (has_runtime_dependents) {
+        return DynamicModuleDecision{
+            .accepted = false,
+            .refusal_reason = DynamicModuleRefusalReason::kDependencyUnavailable,
+            .message = "module has active dependents",
+        };
+    }
+
+    return DynamicModuleDecision{
+        .accepted = true,
+        .refusal_reason = DynamicModuleRefusalReason::kNone,
+        .message = "unload accepted",
+    };
+}
 
 inline bool ValidateDynamicModuleManifest(const DynamicModuleManifest& manifest, std::string* error) {
     auto fail = [error](std::string message) {

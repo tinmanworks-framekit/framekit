@@ -420,6 +420,58 @@ void TestDynamicModuleManifestValidation() {
     REQUIRE(error.find("cannot require itself") != std::string::npos);
 }
 
+void TestDynamicLoadUnloadDecisionSemantics() {
+    const auto accepted_load = framekit::runtime::EvaluateDynamicLoadRequest(
+        framekit::runtime::DynamicLoaderHostPhase::kRunning,
+        false,
+        true);
+    REQUIRE(accepted_load.accepted);
+    REQUIRE(accepted_load.refusal_reason == framekit::runtime::DynamicModuleRefusalReason::kNone);
+
+    const auto rejected_phase_load = framekit::runtime::EvaluateDynamicLoadRequest(
+        framekit::runtime::DynamicLoaderHostPhase::kInitializing,
+        false,
+        true);
+    REQUIRE(!rejected_phase_load.accepted);
+    REQUIRE(rejected_phase_load.refusal_reason == framekit::runtime::DynamicModuleRefusalReason::kIllegalLifecycleState);
+
+    const auto duplicate_load = framekit::runtime::EvaluateDynamicLoadRequest(
+        framekit::runtime::DynamicLoaderHostPhase::kRunning,
+        true,
+        true);
+    REQUIRE(!duplicate_load.accepted);
+    REQUIRE(duplicate_load.refusal_reason == framekit::runtime::DynamicModuleRefusalReason::kDuplicateModuleId);
+
+    framekit::runtime::DynamicModuleManifest manifest;
+    manifest.module_id = "dynamic-a";
+    manifest.module_version = "1.0.0";
+
+    const auto unload_not_allowed = framekit::runtime::EvaluateDynamicUnloadRequest(
+        framekit::runtime::DynamicLoaderHostPhase::kRunning,
+        manifest,
+        true,
+        false);
+    REQUIRE(!unload_not_allowed.accepted);
+    REQUIRE(unload_not_allowed.refusal_reason == framekit::runtime::DynamicModuleRefusalReason::kUnloadNotAllowed);
+
+    manifest.hot_unload_allowed = true;
+    const auto unload_has_dependents = framekit::runtime::EvaluateDynamicUnloadRequest(
+        framekit::runtime::DynamicLoaderHostPhase::kRunning,
+        manifest,
+        true,
+        true);
+    REQUIRE(!unload_has_dependents.accepted);
+    REQUIRE(unload_has_dependents.refusal_reason == framekit::runtime::DynamicModuleRefusalReason::kDependencyUnavailable);
+
+    const auto unload_accepted = framekit::runtime::EvaluateDynamicUnloadRequest(
+        framekit::runtime::DynamicLoaderHostPhase::kRunning,
+        manifest,
+        true,
+        false);
+    REQUIRE(unload_accepted.accepted);
+    REQUIRE(unload_accepted.refusal_reason == framekit::runtime::DynamicModuleRefusalReason::kNone);
+}
+
 void TestEventBusSemantics() {
     framekit::runtime::EventBus bus;
 
@@ -681,6 +733,7 @@ int main() {
     TestInlineExecutionServiceSemantics();
     TestModuleGraphValidation();
     TestDynamicModuleManifestValidation();
+    TestDynamicLoadUnloadDecisionSemantics();
     TestEventBusSemantics();
     TestKernelRuntime();
     TestKernelRuntimeModuleLifecycleOrchestration();
