@@ -61,6 +61,10 @@ if(FRAMEKIT_ENABLE_COCOA)
     )
 endif()
 
+if(FRAMEKIT_BUILD_TESTS)
+    enable_testing()
+endif()
+
 if(FRAMEKIT_BUILD_EXAMPLES)
     add_executable(framekit_single_process_example
         examples/single_process/main.cpp
@@ -71,6 +75,20 @@ if(FRAMEKIT_BUILD_EXAMPLES)
         examples/multi_worker/main.cpp
     )
     target_link_libraries(framekit_multi_worker_example PRIVATE FrameKit::Core)
+
+    if(FRAMEKIT_BUILD_TESTS AND APPLE AND FRAMEKIT_ENABLE_COCOA)
+        add_test(NAME framekit_example_launch_single_process
+            COMMAND framekit_single_process_example
+        )
+        add_test(NAME framekit_example_launch_multi_worker
+            COMMAND framekit_multi_worker_example
+        )
+        set_tests_properties(
+            framekit_example_launch_single_process
+            framekit_example_launch_multi_worker
+            PROPERTIES LABELS "example-launch;platform;cocoa"
+        )
+    endif()
 endif()
 
 if(FRAMEKIT_ENABLE_NETKIT)
@@ -99,6 +117,5 @@ if(FRAMEKIT_ENABLE_NETKIT)
 endif()
 
 if(FRAMEKIT_BUILD_TESTS)
-    enable_testing()
     add_subdirectory(tests)
 endif()
