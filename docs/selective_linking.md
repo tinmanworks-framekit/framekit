@@ -45,4 +45,4 @@ If NetKit is disabled, your FrameKit binaries should not link NetKit artifacts.
   - run `framekit_multi_worker_example`
 - Transport-backed integration validation:
   - build with `FRAMEKIT_ENABLE_NETKIT=ON`
-  - run `framekit_frontend_example` and `framekit_backend_example`
+  - run `ctest --test-dir build --output-on-failure -L integration-example`
