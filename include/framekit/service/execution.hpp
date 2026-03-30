@@ -3,9 +3,11 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
+#include <exception>
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <shared_mutex>
 #include <string>
 #include <unordered_map>
@@ -29,6 +31,23 @@ struct ExecutionServiceShutdownRecord {
     ExecutionServiceOwnership ownership = ExecutionServiceOwnership::kContextOwned;
 };
 
+using ExecutionTaskId = std::uint64_t;
+
+enum class ExecutionTaskState : std::uint8_t {
+    kQueued = 0,
+    kRunning = 1,
+    kCompleted = 2,
+    kCancelled = 3,
+    kFailed = 4,
+    kRejected = 5,
+};
+
+struct ExecutionTaskResult {
+    ExecutionTaskId task_id = 0;
+    ExecutionTaskState state = ExecutionTaskState::kRejected;
+    std::string detail;
+};
+
 class IExecutionService {
 public:
     virtual ~IExecutionService() = default;
@@ -36,6 +55,162 @@ public:
     virtual bool Submit(std::function<void()> task) = 0;
     virtual bool BeginShutdown() = 0;
     virtual bool AwaitShutdown(std::chrono::milliseconds timeout) = 0;
+};
+
+class InlineExecutionService final : public IExecutionService {
+public:
+    InlineExecutionService() = default;
+
+    bool Submit(std::function<void()> task) override {
+        const auto result = SubmitTask(std::move(task));
+        return result.state == ExecutionTaskState::kQueued;
+    }
+
+    ExecutionTaskResult SubmitTask(std::function<void()> task) {
+        std::unique_lock lock(mutex_);
+
+        if (shutting_down_ || !task) {
+            return ExecutionTaskResult{
+                .task_id = 0,
+                .state = ExecutionTaskState::kRejected,
+                .detail = shutting_down_ ? "service is shutting down" : "task is empty",
+            };
+        }
+
+        const auto task_id = next_task_id_++;
+        pending_.push_back(PendingTask{
+            .task_id = task_id,
+            .task = std::move(task),
+        });
+
+        const auto queued = ExecutionTaskResult{
+            .task_id = task_id,
+            .state = ExecutionTaskState::kQueued,
+            .detail = "queued",
+        };
+        results_[task_id] = queued;
+        return queued;
+    }
+
+    bool Cancel(ExecutionTaskId task_id) {
+        std::unique_lock lock(mutex_);
+        if (shutting_down_) {
+            return false;
+        }
+
+        for (auto it = pending_.begin(); it != pending_.end(); ++it) {
+            if (it->task_id != task_id) {
+                continue;
+            }
+
+            pending_.erase(it);
+            results_[task_id] = ExecutionTaskResult{
+                .task_id = task_id,
+                .state = ExecutionTaskState::kCancelled,
+                .detail = "cancelled before execution",
+            };
+            return true;
+        }
+
+        return false;
+    }
+
+    std::vector<ExecutionTaskResult> Drain() {
+        std::vector<PendingTask> to_run;
+        {
+            std::unique_lock lock(mutex_);
+            to_run.swap(pending_);
+        }
+
+        std::vector<ExecutionTaskResult> drained;
+        drained.reserve(to_run.size());
+
+        for (auto& pending : to_run) {
+            {
+                std::unique_lock lock(mutex_);
+                results_[pending.task_id] = ExecutionTaskResult{
+                    .task_id = pending.task_id,
+                    .state = ExecutionTaskState::kRunning,
+                    .detail = "running",
+                };
+            }
+
+            ExecutionTaskResult outcome{
+                .task_id = pending.task_id,
+                .state = ExecutionTaskState::kCompleted,
+                .detail = "completed",
+            };
+
+            try {
+                pending.task();
+            } catch (const std::exception& ex) {
+                outcome.state = ExecutionTaskState::kFailed;
+                outcome.detail = ex.what();
+            } catch (...) {
+                outcome.state = ExecutionTaskState::kFailed;
+                outcome.detail = "task threw non-standard exception";
+            }
+
+            {
+                std::unique_lock lock(mutex_);
+                results_[pending.task_id] = outcome;
+            }
+            drained.push_back(outcome);
+        }
+
+        return drained;
+    }
+
+    bool BeginShutdown() override {
+        std::unique_lock lock(mutex_);
+        if (shutting_down_) {
+            return true;
+        }
+
+        shutting_down_ = true;
+        for (const auto& pending : pending_) {
+            results_[pending.task_id] = ExecutionTaskResult{
+                .task_id = pending.task_id,
+                .state = ExecutionTaskState::kCancelled,
+                .detail = "cancelled by shutdown",
+            };
+        }
+        pending_.clear();
+        return true;
+    }
+
+    bool AwaitShutdown(std::chrono::milliseconds timeout) override {
+        (void)timeout;
+        std::shared_lock lock(mutex_);
+        return shutting_down_;
+    }
+
+    std::size_t PendingCount() const {
+        std::shared_lock lock(mutex_);
+        return pending_.size();
+    }
+
+    std::optional<ExecutionTaskResult> FindResult(ExecutionTaskId task_id) const {
+        std::shared_lock lock(mutex_);
+        const auto found = results_.find(task_id);
+        if (found == results_.end()) {
+            return std::nullopt;
+        }
+
+        return found->second;
+    }
+
+private:
+    struct PendingTask {
+        ExecutionTaskId task_id = 0;
+        std::function<void()> task;
+    };
+
+    mutable std::shared_mutex mutex_;
+    bool shutting_down_ = false;
+    ExecutionTaskId next_task_id_ = 1;
+    std::vector<PendingTask> pending_;
+    std::unordered_map<ExecutionTaskId, ExecutionTaskResult> results_;
 };
 
 class ExecutionServiceRegistry {
