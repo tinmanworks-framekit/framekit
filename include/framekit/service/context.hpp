@@ -161,11 +161,18 @@ public:
             sequence = existing->second.sequence;
         }
 
-        entries_[std::move(service_key)] = ServiceEntry{
-            .instance = std::static_pointer_cast<void>(std::move(service)),
+        auto storage = ServiceEntry{
             .ownership = ownership,
             .sequence = sequence,
         };
+
+        if (ownership == ServiceOwnership::kExternalOwned) {
+            storage.external_instance = std::static_pointer_cast<void>(service);
+        } else {
+            storage.instance = std::static_pointer_cast<void>(std::move(service));
+        }
+
+        entries_[std::move(service_key)] = std::move(storage);
 
         return true;
     }
@@ -181,6 +188,10 @@ public:
         const auto found = entries_.find(service_key);
         if (found == entries_.end()) {
             return nullptr;
+        }
+
+        if (found->second.ownership == ServiceOwnership::kExternalOwned) {
+            return std::static_pointer_cast<T>(found->second.external_instance.lock());
         }
 
         return std::static_pointer_cast<T>(found->second.instance);
@@ -215,6 +226,7 @@ private:
 
     struct ServiceEntry {
         std::shared_ptr<void> instance;
+        std::weak_ptr<void> external_instance;
         ServiceOwnership ownership = ServiceOwnership::kContextOwned;
         std::size_t sequence = 0;
     };
