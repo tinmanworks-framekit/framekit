@@ -48,3 +48,9 @@ add_executable(framekit_fault_policy_runtime_test
 
 target_link_libraries(framekit_fault_policy_runtime_test PRIVATE FrameKit::Core)
 add_test(NAME framekit_fault_policy_runtime_test COMMAND framekit_fault_policy_runtime_test)
+
+add_executable(framekit_execution_service_benchmark
+    test_execution_service_benchmark.cpp
+)
+
+target_link_libraries(framekit_execution_service_benchmark PRIVATE FrameKit::Core)
