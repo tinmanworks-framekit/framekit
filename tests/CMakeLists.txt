@@ -26,6 +26,15 @@ add_executable(framekit_platform_host_runtime_test
 target_link_libraries(framekit_platform_host_runtime_test PRIVATE FrameKit::Core)
 add_test(NAME framekit_platform_host_runtime_test COMMAND framekit_platform_host_runtime_test)
 
+if(APPLE AND FRAMEKIT_ENABLE_COCOA)
+    add_executable(framekit_platform_host_runtime_cocoa_test
+        test_platform_host_runtime_cocoa.cpp
+    )
+
+    target_link_libraries(framekit_platform_host_runtime_cocoa_test PRIVATE FrameKit::Core)
+    add_test(NAME framekit_platform_host_runtime_cocoa_test COMMAND framekit_platform_host_runtime_cocoa_test)
+endif()
+
 add_executable(framekit_input_routing_runtime_test
     test_input_routing_runtime.cpp
 )
@@ -39,3 +48,9 @@ add_executable(framekit_fault_policy_runtime_test
 
 target_link_libraries(framekit_fault_policy_runtime_test PRIVATE FrameKit::Core)
 add_test(NAME framekit_fault_policy_runtime_test COMMAND framekit_fault_policy_runtime_test)
+
+add_executable(framekit_execution_service_benchmark
+    test_execution_service_benchmark.cpp
+)
+
+target_link_libraries(framekit_execution_service_benchmark PRIVATE FrameKit::Core)

@@ -2,9 +2,11 @@
 
 #include <algorithm>
 #include <any>
+#include <chrono>
 #include <cstdlib>
 #include <iostream>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -28,6 +30,38 @@ struct TestService {
 
 struct AlternateService {
     std::string name;
+};
+
+class FakeExecutionService : public framekit::runtime::IExecutionService {
+public:
+    bool Submit(std::function<void()> task) override {
+        submit_calls += 1;
+        if (!accept_submit) {
+            return false;
+        }
+        if (task) {
+            task();
+        }
+        return true;
+    }
+
+    bool BeginShutdown() override {
+        begin_shutdown_calls += 1;
+        return begin_shutdown_result;
+    }
+
+    bool AwaitShutdown(std::chrono::milliseconds timeout) override {
+        (void)timeout;
+        await_shutdown_calls += 1;
+        return await_shutdown_result;
+    }
+
+    int submit_calls = 0;
+    int begin_shutdown_calls = 0;
+    int await_shutdown_calls = 0;
+    bool accept_submit = true;
+    bool begin_shutdown_result = true;
+    bool await_shutdown_result = true;
 };
 
 const char* ModuleLifecyclePhaseName(framekit::runtime::ModuleLifecyclePhase phase) {
@@ -104,8 +138,9 @@ void TestServiceContext() {
 
     REQUIRE(services.Register<TestService>(test_service));
     REQUIRE(!services.Register<TestService>(std::make_shared<TestService>()));
+    auto external_alt = std::make_shared<AlternateService>(AlternateService{"alt"});
     REQUIRE(services.Register<AlternateService>(
-        std::make_shared<AlternateService>(AlternateService{"alt"}),
+        external_alt,
         "alt",
         framekit::runtime::ServiceOwnership::kExternalOwned));
 
@@ -122,16 +157,155 @@ void TestServiceContext() {
     REQUIRE(alt != nullptr);
     REQUIRE(alt->name == "alt");
 
+    alt.reset();
+    external_alt.reset();
+    REQUIRE(services.Find<AlternateService>("alt") == nullptr);
+
     REQUIRE(services.BeginTeardown());
     REQUIRE(services.Phase() == framekit::runtime::ServiceContextPhase::kTeardown);
     REQUIRE(services.Find<TestService>() == nullptr);
+    REQUIRE(services.ServiceCount() == 1);
 
-    const auto& order = services.LastTeardownOrder();
+    const auto order = services.LastTeardownOrder();
     REQUIRE(order.size() == 1);
     REQUIRE(order.front().contract_type == std::type_index(typeid(TestService)));
 
     REQUIRE(services.ResetForNextStartCycle());
     REQUIRE(services.Phase() == framekit::runtime::ServiceContextPhase::kOpen);
+    REQUIRE(services.ServiceCount() == 0);
+}
+
+void TestExecutionServiceRegistry() {
+    framekit::runtime::ExecutionServiceRegistry registry;
+
+    auto first = std::make_shared<FakeExecutionService>();
+    auto second = std::make_shared<FakeExecutionService>();
+    auto external = std::make_shared<FakeExecutionService>();
+
+    REQUIRE(registry.Register(first, "first"));
+    REQUIRE(!registry.Register(std::make_shared<FakeExecutionService>(), "first"));
+    REQUIRE(registry.Register(second, "second"));
+    REQUIRE(registry.Register(
+        external,
+        "external",
+        framekit::runtime::ExecutionServiceOwnership::kExternalOwned));
+
+    REQUIRE(registry.Freeze());
+    REQUIRE(registry.Phase() == framekit::runtime::ExecutionServicePhase::kFrozen);
+    REQUIRE(registry.FreezeCount() == 1);
+    REQUIRE(!registry.Register(std::make_shared<FakeExecutionService>(), "late"));
+
+    auto found_first = registry.Find("first");
+    REQUIRE(found_first != nullptr);
+    auto found_external = registry.Find("external");
+    REQUIRE(found_external != nullptr);
+
+    found_external.reset();
+    external.reset();
+    REQUIRE(registry.Find("external") == nullptr);
+
+    REQUIRE(registry.BeginShutdown(std::chrono::milliseconds{0}));
+    REQUIRE(registry.Phase() == framekit::runtime::ExecutionServicePhase::kShuttingDown);
+    REQUIRE(registry.Find("first") == nullptr);
+    REQUIRE(first->begin_shutdown_calls == 1);
+    REQUIRE(first->await_shutdown_calls == 1);
+    REQUIRE(second->begin_shutdown_calls == 1);
+    REQUIRE(second->await_shutdown_calls == 1);
+    REQUIRE(registry.ServiceCount() == 1);
+
+    const auto shutdown_order = registry.LastShutdownOrder();
+    REQUIRE(shutdown_order.size() == 2);
+    REQUIRE(shutdown_order[0].key == "second");
+    REQUIRE(shutdown_order[1].key == "first");
+
+    REQUIRE(registry.ResetForNextStartCycle());
+    REQUIRE(registry.Phase() == framekit::runtime::ExecutionServicePhase::kOpen);
+    REQUIRE(registry.ServiceCount() == 0);
+
+    framekit::runtime::ExecutionServiceRegistry failure_registry;
+    auto failure_service = std::make_shared<FakeExecutionService>();
+    failure_service->await_shutdown_result = false;
+    REQUIRE(failure_registry.Register(failure_service, "failure"));
+    REQUIRE(!failure_registry.BeginShutdown(std::chrono::milliseconds{0}));
+}
+
+void TestInlineExecutionServiceSemantics() {
+    framekit::runtime::InlineExecutionService service;
+
+    const auto default_policy = service.Policy();
+    REQUIRE(default_policy.kind == framekit::runtime::SchedulerPolicyKind::kSingleThreaded);
+    REQUIRE(default_policy.worker_count == 1);
+
+    service.ConfigurePolicy(framekit::runtime::SchedulerPolicyConfig{
+        .kind = framekit::runtime::SchedulerPolicyKind::kFixedPool,
+        .worker_count = 4,
+        .stage_affinity_enabled = false,
+    });
+    auto fixed_pool = service.Policy();
+    REQUIRE(fixed_pool.kind == framekit::runtime::SchedulerPolicyKind::kFixedPool);
+    REQUIRE(fixed_pool.worker_count == 4);
+
+    service.ConfigurePolicy(framekit::runtime::SchedulerPolicyConfig{
+        .kind = framekit::runtime::SchedulerPolicyKind::kStageAffine,
+        .worker_count = 0,
+        .stage_affinity_enabled = true,
+    });
+    auto stage_affine = service.Policy();
+    REQUIRE(stage_affine.kind == framekit::runtime::SchedulerPolicyKind::kStageAffine);
+    REQUIRE(stage_affine.worker_count == 1);
+    REQUIRE(stage_affine.stage_affinity_enabled);
+
+    int executed = 0;
+    const auto first = service.SubmitTask([&executed]() { executed += 1; });
+    const auto second = service.SubmitTask([&executed]() { executed += 10; });
+
+    REQUIRE(first.state == framekit::runtime::ExecutionTaskState::kQueued);
+    REQUIRE(second.state == framekit::runtime::ExecutionTaskState::kQueued);
+    REQUIRE(service.PendingCount() == 2);
+    auto metrics = service.Metrics();
+    REQUIRE(metrics.submitted == 2);
+    REQUIRE(metrics.pending == 2);
+
+    REQUIRE(service.Cancel(second.task_id));
+    REQUIRE(service.PendingCount() == 1);
+    metrics = service.Metrics();
+    REQUIRE(metrics.cancelled == 1);
+    REQUIRE(metrics.pending == 1);
+    auto cancelled = service.FindResult(second.task_id);
+    REQUIRE(cancelled.has_value());
+    REQUIRE(cancelled->state == framekit::runtime::ExecutionTaskState::kCancelled);
+
+    const auto drained = service.Drain();
+    REQUIRE(drained.size() == 1);
+    REQUIRE(drained.front().task_id == first.task_id);
+    REQUIRE(drained.front().state == framekit::runtime::ExecutionTaskState::kCompleted);
+    REQUIRE(executed == 1);
+    metrics = service.Metrics();
+    REQUIRE(metrics.completed == 1);
+    REQUIRE(metrics.pending == 0);
+
+    auto completed = service.FindResult(first.task_id);
+    REQUIRE(completed.has_value());
+    REQUIRE(completed->state == framekit::runtime::ExecutionTaskState::kCompleted);
+
+    const auto faulty = service.SubmitTask([]() {
+        throw std::runtime_error("boom");
+    });
+    REQUIRE(faulty.state == framekit::runtime::ExecutionTaskState::kQueued);
+    const auto fault_results = service.Drain();
+    REQUIRE(fault_results.size() == 1);
+    REQUIRE(fault_results.front().state == framekit::runtime::ExecutionTaskState::kFailed);
+    REQUIRE(fault_results.front().detail == "boom");
+    metrics = service.Metrics();
+    REQUIRE(metrics.failed == 1);
+
+    REQUIRE(service.BeginShutdown());
+    REQUIRE(service.AwaitShutdown(std::chrono::milliseconds{0}));
+
+    const auto rejected = service.SubmitTask([]() {});
+    REQUIRE(rejected.state == framekit::runtime::ExecutionTaskState::kRejected);
+    metrics = service.Metrics();
+    REQUIRE(metrics.rejected == 1);
 }
 
 void TestModuleGraphValidation() {
@@ -194,6 +368,152 @@ void TestModuleGraphValidation() {
     REQUIRE(!missing_result.valid);
     REQUIRE(!missing_result.errors.empty());
     REQUIRE(missing_result.errors.front().code == framekit::runtime::ModuleGraphErrorCode::kMissingRequiredDependency);
+
+    const std::vector<framekit::runtime::ModuleSpec> invalid_module_id = {
+        framekit::runtime::ModuleSpec{
+            .id = "",
+            .required_dependencies = {},
+            .optional_dependencies = {},
+        },
+    };
+
+    const auto invalid_id_result = framekit::runtime::ValidateModuleGraph(invalid_module_id);
+    REQUIRE(!invalid_id_result.valid);
+    REQUIRE(!invalid_id_result.errors.empty());
+    REQUIRE(invalid_id_result.errors.front().code == framekit::runtime::ModuleGraphErrorCode::kInvalidModuleId);
+}
+
+void TestDynamicModuleManifestValidation() {
+    framekit::runtime::DynamicModuleManifest manifest;
+    manifest.module_id = "dynamic-ui";
+    manifest.module_version = "1.0.0";
+    manifest.required_dependencies = {"core"};
+    manifest.optional_dependencies = {"telemetry"};
+
+    std::string error;
+    REQUIRE(framekit::runtime::ValidateDynamicModuleManifest(manifest, &error));
+    REQUIRE(error.empty());
+
+    framekit::runtime::DynamicModuleManifest empty_id = manifest;
+    empty_id.module_id.clear();
+    REQUIRE(!framekit::runtime::ValidateDynamicModuleManifest(empty_id, &error));
+    REQUIRE(error.find("non-empty") != std::string::npos);
+
+    framekit::runtime::DynamicModuleManifest missing_version = manifest;
+    missing_version.module_version.clear();
+    REQUIRE(!framekit::runtime::ValidateDynamicModuleManifest(missing_version, &error));
+    REQUIRE(error.find("version") != std::string::npos);
+
+    framekit::runtime::DynamicModuleManifest duplicate_required = manifest;
+    duplicate_required.required_dependencies = {"core", "core"};
+    REQUIRE(!framekit::runtime::ValidateDynamicModuleManifest(duplicate_required, &error));
+    REQUIRE(error.find("duplicate") != std::string::npos);
+
+    framekit::runtime::DynamicModuleManifest required_optional_overlap = manifest;
+    required_optional_overlap.optional_dependencies = {"core"};
+    REQUIRE(!framekit::runtime::ValidateDynamicModuleManifest(required_optional_overlap, &error));
+    REQUIRE(error.find("required and optional") != std::string::npos);
+
+    framekit::runtime::DynamicModuleManifest self_dependency = manifest;
+    self_dependency.required_dependencies = {"dynamic-ui"};
+    REQUIRE(!framekit::runtime::ValidateDynamicModuleManifest(self_dependency, &error));
+    REQUIRE(error.find("cannot require itself") != std::string::npos);
+}
+
+void TestDynamicLoadUnloadDecisionSemantics() {
+    const auto accepted_load = framekit::runtime::EvaluateDynamicLoadRequest(
+        framekit::runtime::DynamicLoaderHostPhase::kRunning,
+        false,
+        true);
+    REQUIRE(accepted_load.accepted);
+    REQUIRE(accepted_load.refusal_reason == framekit::runtime::DynamicModuleRefusalReason::kNone);
+
+    const auto rejected_phase_load = framekit::runtime::EvaluateDynamicLoadRequest(
+        framekit::runtime::DynamicLoaderHostPhase::kInitializing,
+        false,
+        true);
+    REQUIRE(!rejected_phase_load.accepted);
+    REQUIRE(rejected_phase_load.refusal_reason == framekit::runtime::DynamicModuleRefusalReason::kIllegalLifecycleState);
+
+    const auto duplicate_load = framekit::runtime::EvaluateDynamicLoadRequest(
+        framekit::runtime::DynamicLoaderHostPhase::kRunning,
+        true,
+        true);
+    REQUIRE(!duplicate_load.accepted);
+    REQUIRE(duplicate_load.refusal_reason == framekit::runtime::DynamicModuleRefusalReason::kDuplicateModuleId);
+
+    framekit::runtime::DynamicModuleManifest manifest;
+    manifest.module_id = "dynamic-a";
+    manifest.module_version = "1.0.0";
+
+    const auto unload_not_allowed = framekit::runtime::EvaluateDynamicUnloadRequest(
+        framekit::runtime::DynamicLoaderHostPhase::kRunning,
+        manifest,
+        true,
+        false);
+    REQUIRE(!unload_not_allowed.accepted);
+    REQUIRE(unload_not_allowed.refusal_reason == framekit::runtime::DynamicModuleRefusalReason::kUnloadNotAllowed);
+
+    manifest.hot_unload_allowed = true;
+    const auto unload_has_dependents = framekit::runtime::EvaluateDynamicUnloadRequest(
+        framekit::runtime::DynamicLoaderHostPhase::kRunning,
+        manifest,
+        true,
+        true);
+    REQUIRE(!unload_has_dependents.accepted);
+    REQUIRE(unload_has_dependents.refusal_reason == framekit::runtime::DynamicModuleRefusalReason::kDependencyUnavailable);
+
+    const auto unload_accepted = framekit::runtime::EvaluateDynamicUnloadRequest(
+        framekit::runtime::DynamicLoaderHostPhase::kRunning,
+        manifest,
+        true,
+        false);
+    REQUIRE(unload_accepted.accepted);
+    REQUIRE(unload_accepted.refusal_reason == framekit::runtime::DynamicModuleRefusalReason::kNone);
+}
+
+void TestDynamicRollbackSemantics() {
+    const std::vector<std::string> loaded_order = {
+        "core",
+        "render",
+        "dynamic-ui",
+    };
+
+    const auto plan = framekit::runtime::BuildDynamicRollbackPlan(loaded_order, "dynamic-ui");
+    REQUIRE(plan.required);
+    REQUIRE(plan.failed_module_id == "dynamic-ui");
+    REQUIRE(plan.unload_order.size() == 1);
+    REQUIRE(plan.unload_order[0] == "dynamic-ui");
+
+    const auto mid_plan = framekit::runtime::BuildDynamicRollbackPlan(loaded_order, "render");
+    REQUIRE(mid_plan.required);
+    REQUIRE(mid_plan.unload_order.size() == 2);
+    REQUIRE(mid_plan.unload_order[0] == "dynamic-ui");
+    REQUIRE(mid_plan.unload_order[1] == "render");
+
+    const auto missing_plan = framekit::runtime::BuildDynamicRollbackPlan(loaded_order, "missing");
+    REQUIRE(!missing_plan.required);
+    REQUIRE(missing_plan.unload_order.empty());
+
+    const auto empty_plan = framekit::runtime::BuildDynamicRollbackPlan(loaded_order, "");
+    REQUIRE(!empty_plan.required);
+
+    const auto rollback_ok = framekit::runtime::AssessDynamicRollbackResult(
+        framekit::runtime::DynamicModuleRollbackResult{
+            .success = true,
+            .unload_failures = 0,
+            .failed_unloads = {},
+        });
+    REQUIRE(rollback_ok.accepted);
+
+    const auto rollback_failed = framekit::runtime::AssessDynamicRollbackResult(
+        framekit::runtime::DynamicModuleRollbackResult{
+            .success = false,
+            .unload_failures = 1,
+            .failed_unloads = {"render"},
+        });
+    REQUIRE(!rollback_failed.accepted);
+    REQUIRE(rollback_failed.refusal_reason == framekit::runtime::DynamicModuleRefusalReason::kIllegalLifecycleState);
 }
 
 void TestEventBusSemantics() {
@@ -453,7 +773,12 @@ int main() {
     TestLifecycleStateMachine();
     TestLoopPolicyValidation();
     TestServiceContext();
+    TestExecutionServiceRegistry();
+    TestInlineExecutionServiceSemantics();
     TestModuleGraphValidation();
+    TestDynamicModuleManifestValidation();
+    TestDynamicLoadUnloadDecisionSemantics();
+    TestDynamicRollbackSemantics();
     TestEventBusSemantics();
     TestKernelRuntime();
     TestKernelRuntimeModuleLifecycleOrchestration();

@@ -51,13 +51,16 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Configure
-        run: cmake -S . -B build -DFRAMEKIT_BUILD_TESTS=ON -DFRAMEKIT_BUILD_EXAMPLES=ON -DFRAMEKIT_ENABLE_NETKIT=OFF -DCMAKE_BUILD_TYPE=Release
+        run: cmake -S . -B build -DFRAMEKIT_BUILD_TESTS=ON -DFRAMEKIT_BUILD_EXAMPLES=ON -DFRAMEKIT_ENABLE_NETKIT=OFF -DFRAMEKIT_ENABLE_COCOA=ON -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
         run: cmake --build build
 
       - name: Test
-        run: ctest --test-dir build --output-on-failure
+        run: ctest --test-dir build --output-on-failure -LE example-launch
+
+      - name: Launch examples (macOS)
+        run: ctest --test-dir build --output-on-failure -L example-launch
 
   framekit-with-netkit:
     name: netkit-shmpipe
@@ -80,7 +83,10 @@ jobs:
         run: cmake --build build
 
       - name: Test
-        run: ctest --test-dir build --output-on-failure
+        run: ctest --test-dir build --output-on-failure -LE integration-example
+
+      - name: Launch integration examples
+        run: ctest --test-dir build --output-on-failure -L integration-example
 
   framekit-with-netkit-macos:
     name: netkit-shmpipe-macos
@@ -97,13 +103,16 @@ jobs:
           path: netkit
 
       - name: Configure
-        run: cmake -S . -B build -DFRAMEKIT_BUILD_TESTS=ON -DFRAMEKIT_BUILD_EXAMPLES=ON -DFRAMEKIT_ENABLE_NETKIT=ON -DFRAMEKIT_NETKIT_SOURCE_DIR=${{ github.workspace }}/netkit -DCMAKE_BUILD_TYPE=Release
+        run: cmake -S . -B build -DFRAMEKIT_BUILD_TESTS=ON -DFRAMEKIT_BUILD_EXAMPLES=ON -DFRAMEKIT_ENABLE_NETKIT=ON -DFRAMEKIT_ENABLE_COCOA=ON -DFRAMEKIT_NETKIT_SOURCE_DIR=${{ github.workspace }}/netkit -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
         run: cmake --build build
 
       - name: Test
-        run: ctest --test-dir build --output-on-failure
+        run: ctest --test-dir build --output-on-failure -LE example-launch
+
+      - name: Launch examples (macOS)
+        run: ctest --test-dir build --output-on-failure -L integration-example
 
   sanitizer-linux:
     name: sanitizer-linux-clang

@@ -1,7 +1,7 @@
 # External Integration Boundary Contract
 
-Status: Draft
-Last Reviewed: 2026-03-29
+Status: Stable
+Last Reviewed: 2026-06-05
 
 ## Purpose
 
@@ -60,3 +60,7 @@ repositories remain FrameKit-independent.
 
 NodeX is an example domain runtime system used to validate this boundary.
 The same separation rules apply to any external runtime.
+
+Companion integration guidance:
+
+- [Composition Matrix](composition-matrix.md)

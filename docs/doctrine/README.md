@@ -13,6 +13,7 @@ The canonical source remains the Doctrine repository.
 - [Doctrine Governance](doctrine-governance.md)
 - [Project Board Workflow](project-board-workflow.md)
 - [Phase 0 Sign-Off Checklist and Implementation Gate](phase0-signoff-gate.md)
+- [Post-Release Roadmap (2026-03-29)](post-release-roadmap-2026-03-29.md)
 
 ## Refresh
 

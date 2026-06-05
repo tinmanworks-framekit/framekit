@@ -1,9 +1,11 @@
 #pragma once
 
 #include <algorithm>
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <shared_mutex>
+#include <stdexcept>
 #include <string>
 #include <typeindex>
 #include <unordered_map>
@@ -67,10 +69,12 @@ public:
         };
 
         std::vector<OrderedEntry> ordered;
+        std::unordered_map<ServiceKey, ServiceEntry, ServiceKeyHasher> external_entries;
         ordered.reserve(entries_.size());
 
         for (const auto& [service_key, entry] : entries_) {
             if (entry.ownership != ServiceOwnership::kContextOwned) {
+                external_entries.emplace(service_key, entry);
                 continue;
             }
 
@@ -98,7 +102,7 @@ public:
             });
         }
 
-        entries_.clear();
+        entries_ = std::move(external_entries);
         return true;
     }
 
@@ -124,7 +128,8 @@ public:
         return entries_.size();
     }
 
-    const std::vector<ServiceTeardownRecord>& LastTeardownOrder() const {
+    std::vector<ServiceTeardownRecord> LastTeardownOrder() const {
+        std::shared_lock lock(mutex_);
         return last_teardown_order_;
     }
 
@@ -156,11 +161,18 @@ public:
             sequence = existing->second.sequence;
         }
 
-        entries_[std::move(service_key)] = ServiceEntry{
-            .instance = std::static_pointer_cast<void>(std::move(service)),
+        auto storage = ServiceEntry{
             .ownership = ownership,
             .sequence = sequence,
         };
+
+        if (ownership == ServiceOwnership::kExternalOwned) {
+            storage.external_instance = std::static_pointer_cast<void>(service);
+        } else {
+            storage.instance = std::static_pointer_cast<void>(std::move(service));
+        }
+
+        entries_[std::move(service_key)] = std::move(storage);
 
         return true;
     }
@@ -176,6 +188,10 @@ public:
         const auto found = entries_.find(service_key);
         if (found == entries_.end()) {
             return nullptr;
+        }
+
+        if (found->second.ownership == ServiceOwnership::kExternalOwned) {
+            return std::static_pointer_cast<T>(found->second.external_instance.lock());
         }
 
         return std::static_pointer_cast<T>(found->second.instance);
@@ -210,6 +226,7 @@ private:
 
     struct ServiceEntry {
         std::shared_ptr<void> instance;
+        std::weak_ptr<void> external_instance;
         ServiceOwnership ownership = ServiceOwnership::kContextOwned;
         std::size_t sequence = 0;
     };

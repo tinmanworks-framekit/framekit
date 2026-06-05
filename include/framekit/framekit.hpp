@@ -33,7 +33,9 @@
 
 // Services and module graph.
 #include "framekit/service/context.hpp"
+#include "framekit/service/execution.hpp"
 #include "framekit/service/bootstrap.hpp"
+#include "framekit/module/dynamic_loader.hpp"
 #include "framekit/module/graph.hpp"
 
 // Multiprocess support contracts.

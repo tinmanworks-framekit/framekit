@@ -169,7 +169,58 @@ void TestStartFailsWhenRenderStagesActiveWithoutWindowHost() {
     runtime.SetPlatformHost(platform);
     REQUIRE(runtime.Configure(policy));
     REQUIRE(!runtime.Start());
-    REQUIRE(!runtime.LastError().empty());
+    REQUIRE(runtime.LastError().find("window host is required") != std::string::npos);
+    REQUIRE(!runtime.IsRunning());
+    REQUIRE(platform->initialize_calls == 1);
+    REQUIRE(platform->teardown_calls == 1);
+}
+
+void TestStartFailureOnWindowCreateTeardownsPlatform() {
+    framekit::runtime::LoopPolicy policy;
+    policy.profile = framekit::runtime::LoopProfile::kGui;
+    policy.rendering_enabled = true;
+
+    auto platform = std::make_shared<FakePlatformHost>();
+    auto window = std::make_shared<FakeWindowHost>();
+    window->create_result = false;
+
+    framekit::runtime::PlatformHostRuntime runtime;
+    runtime.SetPlatformHost(platform);
+    runtime.SetWindowHost(window);
+    REQUIRE(runtime.Configure(policy));
+    REQUIRE(!runtime.Start());
+    REQUIRE(runtime.LastError().find("failed to create primary window") != std::string::npos);
+    REQUIRE(!runtime.IsRunning());
+    REQUIRE(platform->initialize_calls == 1);
+    REQUIRE(platform->teardown_calls == 1);
+    REQUIRE(window->create_calls == 1);
+    REQUIRE(window->teardown_calls == 0);
+}
+
+void TestStopRetriesPlatformTeardownAfterStartupRollbackFailure() {
+    framekit::runtime::LoopPolicy policy;
+    policy.profile = framekit::runtime::LoopProfile::kGui;
+    policy.rendering_enabled = true;
+
+    auto platform = std::make_shared<FakePlatformHost>();
+    auto window = std::make_shared<FakeWindowHost>();
+    platform->teardown_result = false;
+    window->create_result = false;
+
+    framekit::runtime::PlatformHostRuntime runtime;
+    runtime.SetPlatformHost(platform);
+    runtime.SetWindowHost(window);
+    REQUIRE(runtime.Configure(policy));
+    REQUIRE(!runtime.Start());
+    REQUIRE(runtime.LastError().find("platform teardown failed after startup failure") != std::string::npos);
+    REQUIRE(!runtime.IsRunning());
+    REQUIRE(!runtime.Start());
+    REQUIRE(runtime.LastError().find("cleanup is required") != std::string::npos);
+
+    platform->teardown_result = true;
+    REQUIRE(runtime.Stop());
+    REQUIRE(platform->initialize_calls == 1);
+    REQUIRE(platform->teardown_calls == 2);
 }
 
 void TestTickFailsOnPlatformPumpFailure() {
@@ -247,6 +298,8 @@ int main() {
     TestHeadlessRuntimeSkipsWindowStages();
     TestStartFailsWithoutPlatformHost();
     TestStartFailsWhenRenderStagesActiveWithoutWindowHost();
+    TestStartFailureOnWindowCreateTeardownsPlatform();
+    TestStopRetriesPlatformTeardownAfterStartupRollbackFailure();
     TestTickFailsOnPlatformPumpFailure();
     TestTickRenderFailureDegradesThenEscalates();
     TestDeterministicHostRenderFailureFailsFastImmediately();

@@ -26,7 +26,7 @@ ModuleGraphValidationResult ValidateModuleGraph(const std::vector<ModuleSpec>& m
     for (const auto& module : modules) {
         if (module.id.empty()) {
             return Invalid(ModuleGraphError{
-                .code = ModuleGraphErrorCode::kDuplicateModuleId,
+                .code = ModuleGraphErrorCode::kInvalidModuleId,
                 .module_id = module.id,
                 .dependency_id = {},
                 .message = "module id must be non-empty",

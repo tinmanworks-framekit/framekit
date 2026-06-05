@@ -29,3 +29,4 @@ Dynamic loading remains optional future work and is out of baseline scope.
 ## Related Docs
 
 - [Module Contract and Dependency DAG Semantics](../module-contract-dag-semantics.md)
+- [Post-Release Roadmap (2026-03-29)](../doctrine/post-release-roadmap-2026-03-29.md)

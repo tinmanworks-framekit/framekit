@@ -74,6 +74,7 @@ private:
     FaultPolicyRuntime fault_policy_;
     bool configured_ = false;
     bool running_ = false;
+    bool platform_initialized_ = false;
     bool window_created_ = false;
     bool frame_failed_ = false;
     bool has_last_tick_timestamp_ = false;
