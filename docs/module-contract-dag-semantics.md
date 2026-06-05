@@ -1,7 +1,7 @@
 # Module Contract and Dependency DAG Semantics
 
-Status: Draft
-Last Reviewed: 2026-03-29
+Status: Stable
+Last Reviewed: 2026-06-05
 
 ## Purpose
 
