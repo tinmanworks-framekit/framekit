@@ -5,7 +5,7 @@ project(framekit VERSION 2.0.0 LANGUAGES C CXX)
 option(FRAMEKIT_BUILD_TESTS "Build framekit tests" ON)
 option(FRAMEKIT_BUILD_EXAMPLES "Build framekit examples" ON)
 option(FRAMEKIT_ENABLE_NETKIT "Enable NetKit-dependent framekit integrations" OFF)
-option(FRAMEKIT_ENABLE_COCOA "Enable experimental macOS Cocoa backend support" OFF)
+option(FRAMEKIT_ENABLE_COCOA "Enable macOS Cocoa backend support" OFF)
 
 set(FRAMEKIT_NETKIT_SOURCE_DIR "" CACHE PATH "Path to netkit source directory")
 
