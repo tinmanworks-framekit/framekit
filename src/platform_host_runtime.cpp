@@ -36,6 +36,12 @@ bool PlatformHostRuntime::Configure(const LoopPolicy& policy, WindowSpec primary
         return false;
     }
 
+    if (platform_initialized_ || window_created_) {
+        last_error_ = "cannot configure platform runtime while cleanup is pending";
+        configured_ = false;
+        return false;
+    }
+
     if (!loop_runner_.Configure(policy)) {
         last_error_ = loop_runner_.LastError();
         configured_ = false;
@@ -196,6 +202,11 @@ bool PlatformHostRuntime::Start() {
         return false;
     }
 
+    if (platform_initialized_ || window_created_) {
+        last_error_ = "platform runtime cleanup is required before restart";
+        return false;
+    }
+
     const bool has_render_stages = HasActiveRenderStages();
     const bool can_auto_wire_cocoa =
         !platform_host_ &&
@@ -217,16 +228,25 @@ bool PlatformHostRuntime::Start() {
         last_error_ = "platform host initialization failed";
         return false;
     }
+    platform_initialized_ = true;
+
+    auto fail_after_platform_initialize = [this](std::string error) {
+        if (!platform_host_->Teardown()) {
+            error += "; platform teardown failed after startup failure";
+        } else {
+            platform_initialized_ = false;
+        }
+        last_error_ = std::move(error);
+        return false;
+    };
 
     if (has_render_stages) {
         if (!window_host_) {
-            last_error_ = "window host is required when render stages are active";
-            return false;
+            return fail_after_platform_initialize("window host is required when render stages are active");
         }
 
         if (!window_host_->CreatePrimaryWindow(primary_window_)) {
-            last_error_ = "window host failed to create primary window";
-            return false;
+            return fail_after_platform_initialize("window host failed to create primary window");
         }
 
         window_created_ = true;
@@ -268,7 +288,7 @@ bool PlatformHostRuntime::Tick() {
 }
 
 bool PlatformHostRuntime::Stop() {
-    if (!running_) {
+    if (!running_ && !platform_initialized_ && !window_created_) {
         return true;
     }
 
@@ -279,18 +299,21 @@ bool PlatformHostRuntime::Stop() {
             if (last_error_.empty()) {
                 last_error_ = "window host teardown failed";
             }
+        } else {
+            window_created_ = false;
         }
     }
 
-    if (!platform_host_->Teardown()) {
+    if (platform_initialized_ && platform_host_ && !platform_host_->Teardown()) {
         ok = false;
         if (last_error_.empty()) {
             last_error_ = "platform host teardown failed";
         }
+    } else {
+        platform_initialized_ = false;
     }
 
     running_ = false;
-    window_created_ = false;
     frame_failed_ = false;
     has_last_tick_timestamp_ = false;
     return ok;
