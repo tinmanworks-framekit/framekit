@@ -37,7 +37,7 @@ platform-validation surfaces.
 ### Release Evidence
 
 - Release tracking issue: #153
-- Promotion PR: release/v2.1.0 -> master
+- Promotion PR: #154
 - Signed tag: v2.1.0
 
 ## FrameKit v2.0.0
