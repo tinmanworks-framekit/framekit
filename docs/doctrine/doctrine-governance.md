@@ -1,7 +1,7 @@
 # Doctrine Governance
 
 Status: Draft  
-Last Reviewed: 2026-02-28
+Last Reviewed: 2026-06-04
 
 ## Purpose
 
@@ -19,10 +19,11 @@ When two doctrine rules conflict, resolve in this order:
 1. `repo-management.md`
 2. `project-standards.md`
 3. `coding.md`
-4. `naming.md`
-5. `identity.md`
-6. `usernames.md`
-7. `AI_CONTEXT.md`
+4. `export-policy.md`
+5. `naming.md`
+6. `identity.md`
+7. `usernames.md`
+8. `AI_CONTEXT.md`
 
 Conflict handling:
 
@@ -36,6 +37,7 @@ Conflict handling:
 2. Edit doctrine files and update `Last Reviewed`.
 3. Add a Doctrine Change Record from template:
    - `templates/doctrine-change-record-template.md`
+   - Store records under `change-records/`.
 4. If the change affects existing repositories, include migration steps and deadline.
 5. Update `RELEASE_NOTES.md` for the release that introduces the change.
 6. Merge into `develop`, then release using the repo workflow in `repo-management.md`.
