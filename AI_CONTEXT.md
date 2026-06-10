@@ -1,34 +1,33 @@
 # AI Context
 
 Status: Stable  
-Last Reviewed: 2026-02-28
+Last Reviewed: 2026-06-04
 
-Purpose: Provide consistent context to AI tools about identity, naming, and engineering practices.
-
----
-
-## Identity
-
-Primary engineering identity: TinMan  
-Real/legal identity: George Gil
-
-Public authorship should default to TinMan unless explicitly personal/legal.
+Purpose: Provide contributor-neutral context to AI tools about repository standards, engineering practices, and safe public project defaults.
 
 ---
 
-## Naming Tiers
+## Public Context Boundary
 
-Use `usernames.md` as source of truth.
+This file is safe to copy into public repositories.
 
-Choose identity first:
+Do not add maintainer-private identity, legal identity, account ownership details, private contact details, credentials, private infrastructure names, or recovery information here.
 
-- TinMan ladder for engineering/public technical authorship.
-- TinkerSpace ladder for studio/environment/workspace contexts.
+Maintainer-specific preferences belong in a private/local overlay that is not copied into public templates or generated repositories.
 
-Then apply sequential fallback within that ladder only.
-Avoid unrelated suffixes.
+## Authorship and Identity
+
+Follow the repository's visible author, license, contribution, and ownership metadata.
+
+AI tools must not infer, invent, or add personal maintainer identity information. If authorship or account identity is ambiguous, leave it unchanged and ask a maintainer through the normal project workflow.
 
 ---
+
+## Naming
+
+Follow `naming.md` for repository, code, module, and project naming.
+
+Use project-local naming rules when they are more specific than doctrine defaults.
 
 ## Repository Standards
 
@@ -42,7 +41,7 @@ Follow:
 
 ## Technology Orientation
 
-Primary domains:
+Common domains in this ecosystem include:
 
 - Systems programming
 - Robotics

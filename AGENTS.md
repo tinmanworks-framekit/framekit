@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This repository follows Tinman Doctrine.
+This repository follows project doctrine.
 
 ## Agent Operating Rules
 

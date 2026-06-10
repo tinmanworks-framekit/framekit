@@ -1,11 +1,11 @@
 # Project Standards
 
 Status: Stable  
-Last Reviewed: 2026-02-28
+Last Reviewed: 2026-06-04
 
 ## Purpose
 
-Defines structural standards applied to all personal engineering repositories.  
+Defines structural standards applied to project repositories.
 These standards reduce decision fatigue and ensure consistency across projects.
 
 These are not suggestions — they are defaults unless a project has a strong reason to differ.

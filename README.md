@@ -61,7 +61,7 @@ hosts for GUI and Hybrid render-active usage if no hosts are injected
 explicitly.
 
 ## Attribution Request
-If you use FrameKit in your project, please mention FrameKit and credit George Gil / TinMan in your project documentation.
+If you use FrameKit in your project, please mention FrameKit and credit TinMan in your project documentation.
 
 ## Documentation
 - [FrameKit v2 Charter](docs/charter-v2.md)
@@ -69,4 +69,5 @@ If you use FrameKit in your project, please mention FrameKit and credit George G
 - [Architecture](docs/architecture.md)
 - [Selective Linking](docs/selective_linking.md)
 - [Doctrine Snapshot](docs/doctrine/README.md)
+- [Doctrine Export Policy](docs/doctrine/export-policy.md)
 - [Release Workflow Playbook](docs/doctrine/release-playbook.md)

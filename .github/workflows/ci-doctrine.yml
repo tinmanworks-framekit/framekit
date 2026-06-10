@@ -1,0 +1,48 @@
+name: CI (Doctrine)
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  doctrine-export:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate public doctrine export
+        run: |
+          set -euo pipefail
+
+          required_files=(
+            "AGENTS.md"
+            "AI_CONTEXT.md"
+            "docs/doctrine/coding.md"
+            "docs/doctrine/doctrine-governance.md"
+            "docs/doctrine/export-policy.md"
+            "docs/doctrine/naming.md"
+            "docs/doctrine/project-standards.md"
+            "docs/doctrine/repo-management.md"
+            "docs/doctrine/templates/repo-visibility-note-template.md"
+            "docs/doctrine/templates/doctrine-change-record-template.md"
+          )
+
+          for f in "${required_files[@]}"; do
+            [ -f "$f" ] || { echo "Missing required public doctrine file: $f"; exit 1; }
+          done
+
+          test ! -f "docs/doctrine/identity.md"
+          test ! -f "docs/doctrine/usernames.md"
+
+          while IFS= read -r f; do
+            grep -q '^Status: ' "$f" || { echo "Missing Status in $f"; exit 1; }
+            grep -q '^Last Reviewed: ' "$f" || { echo "Missing Last Reviewed in $f"; exit 1; }
+          done < <(find docs/doctrine -name '*.md' ! -name 'README.md' | sort)
+
+          if grep -RInE 'Primary engineering identity|Real/legal identity|George Gil|TinMan ladder|TinkerSpace ladder' \
+            AGENTS.md AI_CONTEXT.md docs/doctrine; then
+            echo "Public doctrine export contains non-exportable identity content"
+            exit 1
+          fi

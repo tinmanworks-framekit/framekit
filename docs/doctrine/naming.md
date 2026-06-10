@@ -1,7 +1,7 @@
 # Naming Conventions
 
 Status: Draft  
-Last Reviewed: 2026-02-27
+Last Reviewed: 2026-06-04
 
 ## Scope
 
@@ -13,7 +13,7 @@ Applies to repositories, code, modules, and project naming.
 - Avoid randomness.
 - Avoid numbers unless technically required.
 - Prefer clarity over cleverness.
-- Avoid mixing identity layers in names.
+- Avoid mixing unrelated brand, product, account, and environment naming scopes.
 
 ---
 
@@ -25,9 +25,9 @@ Applies to repositories, code, modules, and project naming.
 - Avoid vague names.
 
 Examples:
-tinman-portfolio
-frmakekit-engine
-trenex-runtime
+- example-cli
+- render-core
+- workflow-service
 
 ---
 
@@ -52,7 +52,7 @@ SharedMemoryPort
 
 ---
 
-## Studio / Space Naming
+## Product / Space Naming
 
-- Use TinkerSpace only for environments.
-- Do not combine TinMan and TinkerSpace in the same naming scope.
+- Use environment or workspace names only for environment/workspace repositories.
+- Do not combine product, organization, maintainer, and workspace names in the same naming scope unless the repository explicitly documents that convention.
